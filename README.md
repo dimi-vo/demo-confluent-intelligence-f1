@@ -38,7 +38,7 @@ demo-confluent-intelligence-f1/
 ├── docs/
 │   ├── README.md                     # Documentation index
 │   ├── tracks/SELF-SERVICE.md       # Self-service workshop
-│   ├── tracks/PRE-PROVISIONED.md    # Setup in your platform team's environment
+│   ├── tracks/PRE-PROVISIONED.md    # Workshop in your platform team's environment
 │   ├── tracks/HOSTED-WORKSHOP.md    # Hosted workshop attendee labs
 │   ├── organizer/                   # Hosted workshop setup and run of show
 │   └── maintainers/                 # Constraints

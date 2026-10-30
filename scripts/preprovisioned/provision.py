@@ -524,7 +524,7 @@ def deploy(args: argparse.Namespace, root: Path, creds_file: Path, creds: dict) 
         print("3. (optional) Connect an AI agent to the live feed via RTCE:")
         print("     uv run setup-rtce")
     if not labs_live:
-        print(f"\nContinue in docs/tracks/SELF-SERVICE.md at section 1 (your catalog is {catalog}).")
+        print(f"\nContinue in docs/tracks/PRE-PROVISIONED.md at section 1 (your catalog is {catalog}).")
     print("\nTear down when finished:  uv run destroy")
     print("  It deletes your three keys and this card; your environment and everything in it stay.")
 

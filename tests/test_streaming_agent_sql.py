@@ -4,10 +4,12 @@ ROOT = Path(__file__).resolve().parents[1]
 TRACKS = (
     "docs/tracks/HOSTED-WORKSHOP.md",
     "docs/tracks/SELF-SERVICE.md",
+    "docs/tracks/PRE-PROVISIONED.md",
     "docs/tracks/STANDALONE-DEMO.md",
 )
 # (source, marker, tracks that must carry it). The optional Granite forecast was
-# dropped from SELF-SERVICE, so it only syncs to the other two walkthroughs.
+# dropped from SELF-SERVICE, and PRE-PROVISIONED follows SELF-SERVICE, so it only
+# syncs to HOSTED and STANDALONE.
 SQL_SOURCES = (
     ("docs/demo-reference/enrichment_anomaly.sql", "CREATE TABLE `car_state`", TRACKS),
     ("docs/demo-reference/streaming_agent_create_agent.sql", "CREATE AGENT `pit_strategy_agent`", TRACKS),
@@ -26,9 +28,10 @@ def _statement(relative_path: str, marker: str) -> str:
 
 
 def _dedent(text: str) -> str:
-    # SELF-SERVICE embeds these statements inside a numbered list, so every line is
-    # indented to stay in the list item. The File Sync Rule is about the SQL content,
-    # not the markdown indentation, so compare with leading whitespace stripped.
+    # SELF-SERVICE and PRE-PROVISIONED embed these statements inside a numbered list,
+    # so every line is indented to stay in the list item. The File Sync Rule is about
+    # the SQL content, not the markdown indentation, so compare with leading
+    # whitespace stripped.
     return "\n".join(line.lstrip() for line in text.splitlines())
 
 

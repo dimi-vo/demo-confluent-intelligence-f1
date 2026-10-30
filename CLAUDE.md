@@ -23,9 +23,10 @@ no service accounts, no API keys). Each developer signs in through SSO, runs
 `confluent login`, then `uv run deploy --track pre-provisioned`, which runs no
 Terraform: it mints the developer's Global, Kafka and SR keys, writes the card and
 checks the seed. Its walkthrough,
-`docs/tracks/PRE-PROVISIONED.md`, covers section 0 only and hands off to
-`SELF-SERVICE.md` §1; the catalog is the developer's environment (e.g.
-`John-Doe-c21e_env`), not `RIVER-RACING-DEMO-ENV`.
+`docs/tracks/PRE-PROVISIONED.md`, is the developer's whole workshop, sign-in to
+teardown: SELF-SERVICE's sections 1–4, RTCE and challenges, adapted to this track.
+Its catalog is the developer's environment (e.g. `John-Doe-c21e_env`), not
+`RIVER-RACING-DEMO-ENV`.
 
 **Team:** River Racing | **Driver:** John Doe (#88) | **Circuit:** Silverstone | **60 laps**
 
@@ -170,7 +171,7 @@ simply don't do the RTCE lab.
 
 ## Flink Jobs (the labs)
 
-Jobs 1 & 2 are **not** pre-deployed — attendees write them in LAB 3 / LAB 4. The executable SQL source of truth is `docs/demo-reference/`; it is reproduced in all three attendee walkthroughs: `HOSTED-WORKSHOP.md`, `SELF-SERVICE.md`, and `STANDALONE-DEMO.md`.
+Jobs 1 & 2 are **not** pre-deployed — attendees write them in LAB 3 / LAB 4. The executable SQL source of truth is `docs/demo-reference/`; it is reproduced in all four attendee walkthroughs: `HOSTED-WORKSHOP.md`, `SELF-SERVICE.md`, `PRE-PROVISIONED.md`, and `STANDALONE-DEMO.md`.
 
 | Job | SQL file | Input → Output |
 |-----|----------|----------------|
@@ -317,7 +318,7 @@ where a missing Google OAuth client leaves attendee passwords live are all in th
 
 ## File Sync Rule
 
-`docs/demo-reference/*.sql` is the executable Flink SQL source of truth. Its `CREATE TABLE car_state`, `CREATE AGENT pit_strategy_agent`, and `CREATE TABLE pit_decisions` statements must match the copy/paste SQL in all three attendee walkthroughs: `docs/tracks/HOSTED-WORKSHOP.md`, `docs/tracks/SELF-SERVICE.md`, and `docs/tracks/STANDALONE-DEMO.md`. `docs/tracks/PRE-PROVISIONED.md` is deliberately not in the set: it covers setup only, hands off to SELF-SERVICE §1, and must carry no SQL. The optional `AI_FORECAST` statement syncs only to HOSTED and STANDALONE — SELF-SERVICE no longer carries it. When changing a statement, update the source file and every walkthrough copy in the same change, then compare the fenced SQL with the source before merging. `docs/demo-reference/orchestrate_social_agent.md` remains the source of truth for the non-SQL Lab 5 configuration. The organizer guide links to the walkthrough and must not duplicate attendee SQL.
+`docs/demo-reference/*.sql` is the executable Flink SQL source of truth. Its `CREATE TABLE car_state`, `CREATE AGENT pit_strategy_agent`, and `CREATE TABLE pit_decisions` statements must match the copy/paste SQL in all four attendee walkthroughs: `docs/tracks/HOSTED-WORKSHOP.md`, `docs/tracks/SELF-SERVICE.md`, `docs/tracks/PRE-PROVISIONED.md`, and `docs/tracks/STANDALONE-DEMO.md`. The optional `AI_FORECAST` statement syncs only to HOSTED and STANDALONE — neither SELF-SERVICE nor PRE-PROVISIONED carries it. PRE-PROVISIONED repeats SELF-SERVICE's sections 1–4, RTCE section and challenges, so a prose change to those usually belongs in both. When changing a statement, update the source file and every walkthrough copy in the same change, then compare the fenced SQL with the source before merging. `docs/demo-reference/orchestrate_social_agent.md` remains the source of truth for the non-SQL Lab 5 configuration. The organizer guide links to the walkthrough and must not duplicate attendee SQL.
 
 The old split lab files remain in git history and aren't part of the sync set.
 Do not restore `labs/instructor-led/` or copy SQL into organizer docs. The default

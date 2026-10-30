@@ -1,9 +1,9 @@
 """Pit Wall section labels: 'steps' for every solo-track card, 'labs' for hosted.
 
 The locked panels name the section that unlocks them. The solo walkthroughs
-(SELF-SERVICE.md, STANDALONE-DEMO.md) number theirs as steps, the hosted one as
-labs. `_labels_for_card` used to list only self-service and standalone, so a
-pre-provisioned card — whose attendee follows SELF-SERVICE.md — said "Lab 3".
+(SELF-SERVICE.md, PRE-PROVISIONED.md, STANDALONE-DEMO.md) number theirs as steps,
+the hosted one as labs. `_labels_for_card` used to list only self-service and
+standalone, so a pre-provisioned card said "Lab 3".
 """
 
 from __future__ import annotations
