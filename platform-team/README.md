@@ -1,10 +1,12 @@
 # Platform team guide: F1 Pit Wall AI Workshop
 
-**This guide is for the team that owns your Confluent Cloud organization.** It is everything you need to prepare, run and clean up the workshop's environments, step by step, in the order you do it. You don't need the rest of the workshop repository; only the instructor's rehearsal uses it.
+Read this if you are the platform team that wants to provision 1 environment per participant.
+
+It is everything you need to prepare, run and clean up the workshop's environments. 
 
 ## What this does
 
-This Terraform module builds **each developer's whole workshop stack**. Per developer, it creates:
+This Terraform module builds **each developer's workshop stack**:
 
 - **a new, empty environment**, named after their email (see [Environment names](#environment-names)), with the Stream Governance Advanced package, and a role binding that makes the developer **EnvironmentAdmin** on it through their own user account;
 - **a Standard, single-zone Kafka cluster**, `RIVER-RACING-DEMO-CLUSTER`, on AWS in `region` (default `us-east-1`, the same for everyone). The environment's Schema Registry comes up with it;
@@ -30,9 +32,10 @@ On the developer side, each person signs in to the Console (through SSO, if you 
 | A few days before | [7. Create the instructors' environments](#7-create-the-instructors-environments) |
 | | [8. Rehearse the developer flow](#8-rehearse-the-developer-flow) |
 | Shortly before the workshop | [9. Add everyone else](#9-add-everyone-else) |
-| | [10. Send each developer their environment](#10-send-each-developer-their-environment) |
+| | [10. Validate the environments](#10-validate-the-environments) |
+| | [11. Developer access](#11-developer-access) |
 | During the workshop | [When a developer comes to you](#when-a-developer-comes-to-you) |
-| Afterwards | [11. Tear down](#11-tear-down) |
+| Afterwards | [12. Tear down](#12-tear-down) |
 
 The clusters bill from the moment they're created, so apply everyone's stacks shortly before the workshop; the instructors' go first, for the rehearsal.
 
@@ -53,7 +56,7 @@ Enter your work email. With SSO, it opens your organization's sign-in page in yo
 
 ## 2. Get an OrganizationAdmin Global API key
 
-The module runs with one Global API key owned by an OrganizationAdmin. It must be a **Global** key, not a Cloud resource management key, because it also signs every Flink statement. The module never creates it.
+The module runs with one **Global** API key owned by an `OrganizationAdmin`.
 
 List the Global keys you already own:
 
@@ -73,17 +76,17 @@ Reuse one of them if you have its secret. Otherwise create one:
 confluent api-key create --resource global
 ```
 
-It prints the key and its secret. **Save the secret now: it's shown only once.** A user can own at most 2 Global keys; if you already have 2, delete one you no longer use in the Console under **API keys** → **My account**.
+It prints the key and its secret. **Save the secret now: it's shown only once.**
 
-Then confirm that the key's owner (the `Owner` column above, `u-…`) is an OrganizationAdmin:
+A user can own at most 2 Global API keys.
+
+Then confirm that the key's `Owner` is an `OrganizationAdmin`:
 
 ```bash
 confluent iam rbac role-binding list --principal User:<owner-id> --role OrganizationAdmin
 ```
 
-One row means it is. `None found.` means it isn't: use a key owned by an OrganizationAdmin instead.
-
-A service account with the OrganizationAdmin role can own the key too: `confluent api-key create --resource global --service-account <sa-id>`, then check it with `--principal User:<sa-id>`.
+One row means the user is `OrganizationAdmin`.
 
 ## 3. Check that every developer is a user in your organization
 
@@ -103,9 +106,7 @@ Every developer's email must be in the `Email` column, and that is how you'll wr
     confluent iam user invitation list
     ```
 
-    An accepted invitation shows `INVITE_STATUS_ACCEPTED`.
-
-Developers need no roles before the apply: it makes each one EnvironmentAdmin on their own environment.
+Developers need no roles before the apply. We will make each one `EnvironmentAdmin` after the provision of their environments.
 
 ## 4. Check your quotas
 
@@ -126,9 +127,15 @@ Each prints one row, like this (columns after `Usage` trimmed):
                                | Organization                   |              |               |       |
 ```
 
-**For each of the three, `Applied Limit` minus `Usage` must be at least N.** An empty `Usage` means 0. In the example, the organization has room for 28 more environments. Leave some headroom on `kafka.max_kafka_creation.per_day` in case you have to replace a stack on the same day.
+**For each of the three, `Applied Limit` minus `Usage` must be at least N.** 
 
-Raise a quota through Confluent Support. Allow time for the request.
+An empty `Usage` means 0. 
+
+In the example, the organization has room for 28 more environments. 
+
+> ![IMPORTANT]Leave some headroom on `kafka.max_kafka_creation.per_day` in case you have to replace a stack on the same day.
+
+> ![IMPORTANT]Raise a quota through Confluent Support **if needed**.
 
 ## 5. Check the region
 
@@ -150,8 +157,8 @@ There are no commands for these; confirm them with your network and identity tea
 - **No IP filter blocks the developers' networks** from Kafka, Flink, Schema Registry or the Confluent Cloud management API.
 - **The developers' own network allows outbound traffic to Confluent Cloud** on ports 443 and 9092. The workshop's race simulator runs on each developer's laptop and produces to Kafka directly.
 - **Public networking only.** Each developer's cluster is a Standard cluster on public endpoints.
-- **Keep the module's direct role bindings.** Each developer must be EnvironmentAdmin directly, as a role binding on their user, which is what the module creates. Don't replace it with an SSO group mapping: a user's API keys don't carry group-mapped permissions, so a developer who is EnvironmentAdmin only through a group can't deploy.
-- **New, empty environments only.** The module always creates fresh environments; don't swap in environments you already have. A reused environment can already have a Schema Registry in another region. In our testing, an environment whose Schema Registry was in `eu-central-1` made the first schema registration fail.
+- **Keep the module's direct role bindings.** Each developer must be `EnvironmentAdmin` directly, as a role binding on their user, which is what the module creates. Don't replace it with an SSO group mapping: a user's API keys don't carry group-mapped permissions, so a developer who is `EnvironmentAdmin` only through a group can't deploy.
+- **New, empty environments only.** The module always creates fresh environments; don't swap in environments you already have.
 
 ## 7. Create the instructors' environments
 
@@ -176,13 +183,30 @@ terraform apply terraform.tfplan
 rm terraform.tfplan
 ```
 
-- **`terraform plan`** ends with `Plan: N to add, 0 to change, 0 to destroy.`, where N is 11 per person: a random name suffix, the environment, the role binding, the cluster, the compute pool, a 30-second pause once the cluster is up, and five Flink statements (three tables, the seed and the model). It fails before creating anything if:
-    - your key or secret is wrong, or the key has expired or been deleted;
-    - an email isn't a user in your organization;
-    - the same person appears twice (emails are compared case-insensitively);
-    - an email's part before the `@` has no letter or digit to name an environment after.
-- **`terraform apply`** takes a few minutes, mostly waiting for the clusters. If it stops, see [If the apply stops](#if-the-apply-stops).
-- **`rm terraform.tfplan`:** the saved plan contains your API secret in plain text.
+**`terraform plan`** ends with `Plan: N to add, 0 to change, 0 to destroy.`, where **N is 11 per person**.
+
+1. A random name suffix
+2. One environment
+3. One role binding for the user
+4. One Standard cluster
+5. One Flink compute pool
+6. A 30-second pause
+7. Flink statement: create the `car_telemetry` table
+8. Flink statement: create the `race_standings` table
+9. Flink statement: create the `driver_race_history` table
+10. Flink statement: seed `driver_race_history` with its 198 rows
+11. Flink statement: create the `llm_textgen_model` model
+
+It fails before creating anything if:
+
+- your key or secret is wrong, or the key has expired or been deleted;
+- an email isn't a user in your organization;
+- the same person appears twice (emails are compared case-insensitively);
+- an email's part before the `@` has no letter or digit to name an environment after.
+
+**`terraform apply`** takes a few minutes, mostly waiting for the clusters. If it stops, see [what to do if the apply stops](#if-the-apply-stops).
+
+**`rm terraform.tfplan`:** the saved plan contains your API secret in plain text.
 
 Then check the result:
 
@@ -191,8 +215,9 @@ terraform plan
 terraform output -raw handout
 ```
 
-- **`terraform plan`** must report `No changes.` Applying again never renames an environment, because each name's suffix is kept in state.
-- **`terraform output -raw handout`** lists each person's environment name and ID (see [step 10](#10-send-each-developer-their-environment)).
+**`terraform plan`** must report `No changes.` Applying again never renames an environment, because each name's suffix is kept in state.
+
+**`terraform output -raw handout`** lists each person's environment name and ID (see [step 11](#11-developer-access)).
 
 To see one environment's Flink statements, with its ID from the handout:
 
@@ -204,29 +229,7 @@ All five of yours (named `tf-…`) should be `COMPLETED`. The seed is the `INSER
 
 ### If the apply stops
 
-If it stops on **`Statement with name "tf-…" already exists`**, or on a statement that failed with **"technical difficulties on our end"**, run the `plan -out`, `apply` and `rm` commands again. Both errors are transient. The tables and the model are created with `IF NOT EXISTS`, so a second run only adds what's missing; the seed is the exception (see [The `driver_race_history` seed](#the-driver_race_history-seed)).
-
-## 8. Rehearse the developer flow
-
-Have an instructor run the whole developer flow in their own environment, a few days ahead: the [pre-provisioned walkthrough](../docs/tracks/PRE-PROVISIONED.md)'s deploy, then the walkthrough's core steps through to the pit-strategy agent and its pit decisions. Confirm that:
-
-- `SHOW MODELS;` in the Flink SQL workspace lists `anthropic.claude-sonnet-4-6`;
-- the deploy finishes. It counts the `driver_race_history` rows, so a clean finish shows the seed worked;
-- the pit-strategy agent (`CREATE AGENT`, then `AI_RUN_AGENT`) runs and writes pit-stop decisions.
-
-The agent calls a Confluent-hosted model. **Confirm with your Confluent account team how that inference is billed** in your organization.
-
-**Lightning Queries:** the walkthrough's optional Challenge #2 uses Lightning Queries, which is Early Access and may not be enabled for your organization. During the rehearsal, have the instructor enable the Real-Time Context Engine on the `car_telemetry` topic in the Console (the walkthrough shows how), then run, from the workshop repository:
-
-```bash
-uv run setup-rtce --lightning
-```
-
-If it reports `api_not_enabled`, Lightning Queries aren't enabled for your organization: ask your Confluent account team, or tell developers to skip Challenge #2. Otherwise it prints a `curl` command. Run it: a JSON query result rather than an error (HTTP 200) means Lightning Queries work.
-
-## 9. Add everyone else
-
-Shortly before the workshop, add everyone else's emails to `developer_emails`, then run the same commands as in step 7:
+If it stops on **`Statement with name "tf-…" already exists`**, or on a statement that failed with **"technical difficulties on our end"**, run the same three commands again, from this folder:
 
 ```bash
 terraform plan -out=terraform.tfplan
@@ -234,16 +237,99 @@ terraform apply terraform.tfplan
 rm terraform.tfplan
 ```
 
-**Check the plan before you apply it:** it must say `0 to change, 0 to destroy`, with 11 to add per new person. Each stack belongs to its exact email string, so:
+Both errors are transient. The tables and the model are created with `IF NOT EXISTS`, so a second run only adds what's missing; the seed is the exception (see [The `driver_race_history` seed](#the-driver_race_history-seed)).
+
+## 8. Rehearse the developer flow
+
+Have an instructor run the whole developer flow in their own environment, a few days ahead: the [pre-provisioned walkthrough](../docs/tracks/PRE-PROVISIONED.md)'s deploy.
+
+The agent calls a Confluent-hosted model. **Confirm with your Confluent account team how that inference is billed** in your organization.
+
+**Lightning Queries:** the walkthrough's optional Challenge #2 uses Lightning Queries, which is Early Access.
+
+During the rehearsal, have the instructor enable the Real-Time Context Engine on the `car_telemetry` topic in the Console (the walkthrough shows how), then run, from the workshop repository:
+
+```bash
+uv run setup-rtce --lightning
+```
+
+If it reports `api_not_enabled`, Lightning Queries aren't enabled for your organization: ask your Confluent account team, or tell developers to skip Challenge #2.
+
+If it prints a `curl` command, run it. A JSON query result rather than an error (HTTP 200) means Lightning Queries work.
+
+## 9. Add everyone else
+
+If not done already, shortly before the workshop, add everyone else's emails to `developer_emails`, then run the same commands as in step 7:
+
+```bash
+terraform plan -out=terraform.tfplan
+terraform apply terraform.tfplan
+rm terraform.tfplan
+```
+
+**Check the plan before you apply it:** it must say `0 to change, 0 to destroy`, **with 11 to add per new person**. 
+
+Each stack belongs to its exact email string, so:
 
 - **removing an email destroys that person's whole stack:** the environment, the cluster, the compute pool, the tables, and any work of theirs in it;
 - **changing an existing entry**, even only its case, replaces that stack with a new, empty one.
 
-The same applies to anyone who joins late: add their email, plan and apply. Existing stacks aren't touched (unless it's been more than 30 days, see [The `driver_race_history` seed](#the-driver_race_history-seed)).
-
 Afterwards, `terraform plan` must again report `No changes.`
 
-## 10. Send each developer their environment
+## 10. Validate the environments
+
+Print the checks, with every environment's IDs and names filled in:
+
+```bash
+terraform output -raw validation
+```
+
+It prints three checks per person, in the same order as the handout:
+
+```text
+jane.doe@example.com: jane-doe-7f3a_env (env-a1b2c3)
+
+  1. The five statements are COMPLETED:
+     confluent flink statement list --environment env-a1b2c3 --cloud aws --region us-east-1
+
+  2. The topics car_telemetry, race_standings and driver_race_history exist:
+     confluent kafka topic list --environment env-a1b2c3 --cluster lkc-1x2y3z
+
+  3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool RIVER-RACING-DEMO-pool):
+     SELECT COUNT(*) FROM `jane-doe-7f3a_env`.`RIVER-RACING-DEMO-CLUSTER`.`driver_race_history`;
+
+john.smith@example.com: john-smith-c21e_env (env-d4e5f6)
+
+  1. The five statements are COMPLETED:
+     confluent flink statement list --environment env-d4e5f6 --cloud aws --region us-east-1
+
+  2. The topics car_telemetry, race_standings and driver_race_history exist:
+     confluent kafka topic list --environment env-d4e5f6 --cluster lkc-4u5v6w
+
+  3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool RIVER-RACING-DEMO-pool):
+     SELECT COUNT(*) FROM `john-smith-c21e_env`.`RIVER-RACING-DEMO-CLUSTER`.`driver_race_history`;
+```
+
+Run the three checks for each person, in order:
+
+**1. The five statements are `COMPLETED`.** Run the printed `confluent flink statement list`. It must show the five statements from [step 7](#7-create-the-instructors-environments), named `tf-…`, all `COMPLETED`. If one is `FAILED`, or missing, follow [If the apply stops](#if-the-apply-stops). If the seed (`INSERT INTO driver_race_history`) is still `RUNNING`, wait for it before check 3: until then the count is still rising.
+
+**2. The three topics exist.** Run the printed `confluent kafka topic list`. Each source table's `CREATE TABLE` statement creates its Kafka topic, so the list must include `car_telemetry`, `race_standings` and `driver_race_history`. (`car_state` and `pit_decisions` aren't there yet: the developers create them in the labs.) If one is missing, its statement didn't complete: follow [If the apply stops](#if-the-apply-stops).
+
+**3. `driver_race_history` holds exactly 198 rows.** The Confluent CLI can't print a query's result, so this check runs in the Console. Open the [Flink SQL workspace](https://confluent.cloud/workspaces/) on the person's environment and its `RIVER-RACING-DEMO-pool` compute pool, and run the printed `SELECT`. It names the table in full, so the workspace's selected catalog and database don't matter.
+
+The count climbs for a few seconds, then settles. **It must settle on `198`.** Then stop the query: it's a streaming query, and keeps running in the developer's pool until you do.
+
+- **`396`:** the seed ran twice.
+- **Anything else, `0` included:** the seed didn't land.
+
+In both cases, rebuild the table as in [The `driver_race_history` seed](#the-driver_race_history-seed) and count again.
+
+## 11. Developer access
+
+Each develop can now sign in Confluent Cloud. They should be able to see only the environment they have been granted access too.
+
+If a developer has access to multiple environments, you can use the terraform output to point them to the one they should be using in this workshop.
 
 ```bash
 terraform output -raw handout
@@ -264,7 +350,7 @@ The deploy stops with a message that names you in these cases:
 | The developer sees | What to do |
 |---|---|
 | `Your platform team hasn't provisioned <name> (<id>) yet: it has no …` | Their stack is incomplete, most likely because an apply stopped. Run the `plan -out`, `apply` and `rm` commands again (see [If the apply stops](#if-the-apply-stops)). |
-| `Your Global key sees no environment you're directly bound to.` | Their email is missing from `developer_emails`, or they signed in with another account. Check the [handout](#10-send-each-developer-their-environment) and which email they used. |
+| `Your Global key sees no environment you're directly bound to.` | Their email is missing from `developer_emails`, or they signed in with another account. Check the [handout](#11-developer-access) and which email they used. |
 | `driver_race_history holds N rows, expected 198` | Rebuild their table: see [The `driver_race_history` seed](#the-driver_race_history-seed). |
 
 A developer who sees **`Confluent Cloud refused a new Global key`** already holds the 2 Global keys a user may own. They delete one in the Console under **API keys** → **My account**; you don't need to do anything.
@@ -273,7 +359,7 @@ A developer who sees **`Confluent Cloud refused a new Global key`** already hold
 
 The 198 rows are one plain `INSERT`. Terraform returns as soon as it starts running, so **a clean apply doesn't prove the rows landed**, and a re-apply after the errors in [If the apply stops](#if-the-apply-stops) can occasionally insert them twice.
 
-**Each developer's deploy is the check.** It counts the rows, carries on at 198, seeds an empty table itself, and on any other count stops with `driver_race_history holds N rows, expected 198` and sends the developer to you. To rebuild that developer's table, with the Confluent CLI signed in as an OrganizationAdmin and their environment ID from the [handout](#10-send-each-developer-their-environment):
+**[Step 10](#10-validate-the-environments) is the check, and each developer's deploy repeats it.** The deploy counts the rows, carries on at 198, seeds an empty table itself, and on any other count stops with `driver_race_history holds N rows, expected 198` and sends the developer to you. To rebuild that developer's table, with the Confluent CLI signed in as an OrganizationAdmin and their environment ID from the [handout](#11-developer-access):
 
 ```bash
 confluent kafka cluster list --environment <env-id>    # their cluster ID
@@ -299,7 +385,7 @@ Two more things about the seed:
 - **Don't edit or regenerate `modules/developer/driver_race_history_seed.sql` between apply and destroy.** A changed statement is most likely replaced, which would insert the 198 rows again.
 - **Re-applying more than 30 days after the first apply re-runs the seed.** Confluent Cloud deletes finished statements after 30 days, so Terraform creates them again: the tables and the model are unaffected, but each `driver_race_history` gets its rows twice. Rebuild as above.
 
-## 11. Tear down
+## 12. Tear down
 
 1. **Each developer runs `uv run destroy`.** It deletes the three API keys their deploy minted, Global key included, and their local credential card. It leaves the environment and everything in it to you.
 2. **You run, from this folder:**
@@ -314,7 +400,9 @@ No extra step is needed when developers' own Flink statements are still running 
 
 If a developer can't run step 1, their keys outlive their stack. The Kafka and Schema Registry keys are useless once the cluster and environment are gone, but the Global key keeps any other roles that developer holds in your organization. Have them delete it in the Console under **API keys** → **My account**, or delete it yourself.
 
-## Reference
+<details>
+
+<summary>Click to expand</summary>
 
 ### Environment names
 
@@ -341,7 +429,8 @@ State is local by default (`terraform.tfstate` in this folder). To keep it somew
 | `providers.tf` | The Confluent provider, configured with your OrganizationAdmin Global key |
 | `variables.tf` | Your key and secret, `developer_emails` and the checks on it, `region`, `flink_max_cfu`, `csp_hosted_model` |
 | `main.tf` | The user lookups, the lookup of your key's owner, the name suffixes, and one `modules/developer` per email |
-| `outputs.tf` | The `handout` table |
+| `outputs.tf` | The `handout` table, and the `validation` checks of [step 10](#10-validate-the-environments) |
 | `modules/developer/` | One developer's stack: environment, role binding, cluster, compute pool, and the tables, seed and model (`statements.tf`, `driver_race_history_seed.sql`) |
 | `terraform.tfvars.example` | A starting point for your `terraform.tfvars` |
-| `tests/` | Offline checks of the naming, the email list and the developer stack (`terraform test`); every provider is mocked, so they never contact Confluent Cloud |
+| `tests/` | Offline checks of the naming, the email list, the developer stack and the outputs (`terraform test`); every provider is mocked, so they never contact Confluent Cloud |
+</details>
