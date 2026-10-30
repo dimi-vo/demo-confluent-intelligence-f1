@@ -22,6 +22,12 @@ mock_provider "confluent" {
       rest_endpoint = "https://flink.us-east-1.aws.confluent.cloud"
     }
   }
+
+  mock_resource "confluent_kafka_cluster" {
+    defaults = {
+      id = "lkc-mock01"
+    }
+  }
 }
 
 mock_provider "http" {
@@ -61,5 +67,36 @@ run "creates_one_environment_per_developer" {
       "",
     ])
     error_message = "handout should be an aligned table: email, environment name, environment ID, Console URL"
+  }
+}
+
+run "validation_fills_in_each_developers_ids" {
+  # Set here, so a local terraform.tfvars can't change it.
+  variables {
+    region = "us-east-1"
+  }
+
+  # Same email order as the handout; the SQL names the table in full.
+  assert {
+    condition = output.validation == join("\n", [
+      for email, name in {
+        "John.Doe@example.com"          = "John-Doe-${random_id.env_suffix["John.Doe@example.com"].hex}_env"
+        "jane.doe+envadmin@example.com" = "jane-doe-envadmin-${random_id.env_suffix["jane.doe+envadmin@example.com"].hex}_env"
+      } :
+      join("\n", [
+        "${email}: ${name} (env-mock01)",
+        "",
+        "  1. The five statements are COMPLETED:",
+        "     confluent flink statement list --environment env-mock01 --cloud aws --region us-east-1",
+        "",
+        "  2. The topics car_telemetry, race_standings and driver_race_history exist:",
+        "     confluent kafka topic list --environment env-mock01 --cluster lkc-mock01",
+        "",
+        "  3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool RIVER-RACING-DEMO-pool):",
+        "     SELECT COUNT(*) FROM `${name}`.`RIVER-RACING-DEMO-CLUSTER`.`driver_race_history`;",
+        "",
+      ])
+    ])
+    error_message = "validation should print each developer's three checks with their environment ID, cluster ID and names filled in"
   }
 }
