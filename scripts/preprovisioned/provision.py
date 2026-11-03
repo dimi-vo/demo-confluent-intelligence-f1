@@ -514,17 +514,8 @@ def deploy(args: argparse.Namespace, root: Path, creds_file: Path, creds: dict) 
         print("LAB 3 and LAB 4 are already running — they start filling as soon as the race does.")
         print("  `car_state` stays empty for ~4 min while anomaly detection fills its")
         print("  first 12 windows of context. The anomaly fires around lap 24.\n")
-    print("1. Start the live race feed (leave running in its own terminal):")
-    print(f"     uv run f1-race          # {seconds_per_lap}s/lap, from this deployment's config")
     if not labs_live:
-        print("   Create `car_state` first (section 1) — laps raced before it is Running are lost.")
-    print("2. Open the live dashboard:")
-    print("     uv run f1-pitwall")
-    if out["rtce_api_key"]:
-        print("3. (optional) Connect an AI agent to the live feed via RTCE:")
-        print("     uv run setup-rtce")
-    if not labs_live:
-        print(f"\nContinue in docs/tracks/PRE-PROVISIONED.md at section 1 (your catalog is {catalog}).")
+        print(f"Continue in docs/tracks/PRE-PROVISIONED.md at section 1 (your catalog is {catalog}).")
     print("\nTear down when finished:  uv run destroy")
     print("  It deletes your three keys and this card; your environment and everything in it stay.")
 
