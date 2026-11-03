@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F1 Pit Wall workshop</title>
+  <script>
+    // Pick the theme before first paint so there's no flash.
+    (function () {
+      var t;
+      try { t = JSON.parse(localStorage.getItem("f1pw:theme")); } catch (e) {}
+      if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" type="button" aria-label="Contents"></button>
+  <a class="brand" href="#welcome"><span class="brand-mark">88</span>F1 Pit Wall <small>· Pre-provisioned workshop</small></a>
+  <div class="topbar-right">
+    <span class="step-count" id="step-count"></span>
+    <button class="icon-btn" id="theme-btn" type="button"></button>
+  </div>
+  <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+</header>
+
+<nav class="toc" id="toc" aria-label="Contents"></nav>
+<div class="scrim"></div>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════ WELCOME -->
+<article class="page hero" id="welcome" data-title="Welcome" data-group="Start here">
+  <h1>Build an AI pit wall on a live race</h1>
+  <p class="lead">
+    Stream telemetry from a simulated Silverstone race, catch a failing tire with Flink SQL,
+    and let a streaming AI agent make the pit call — all inside the Confluent Cloud
+    environment your platform team built for you.
+  </p>
+
+  <a class="btn" href="#sign-in">Start the workshop
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </a>
+
+  <div class="cards">
+    <div class="card">
+      <span class="num">Detect</span>
+      <h3>Spot the anomaly</h3>
+      <p>Join live telemetry with race standings and flag an overheating front-left tire with <code>ML_DETECT_ANOMALIES</code>.</p>
+    </div>
+    <div class="card">
+      <span class="num">Decide</span>
+      <h3>Call the pit stop</h3>
+      <p>A Flink streaming agent reads every lap and recommends stay out, pit soon, or pit now.</p>
+    </div>
+    <div class="card">
+      <span class="num">Explore</span>
+      <h3>Ask your agent</h3>
+      <p>Query the live race from Claude Code or Codex through the Real-Time Context Engine.</p>
+    </div>
+  </div>
+
+  <h2>Before you begin</h2>
+  <ul class="checklist">
+    <li>Your platform team has created a Confluent Cloud environment for you and made you its EnvironmentAdmin.</li>
+    <li>You can sign in to Confluent Cloud with your work email.</li>
+    <li>You have a terminal on a Mac or Windows machine.</li>
+  </ul>
+
+  <details class="more image">
+    <summary>See the architecture</summary>
+    <div class="more-body">
+      <figure>
+        <img src="../assets/architecture.png" alt="F1 Pit Wall Confluent Intelligence architecture">
+        <figcaption>Race simulator → Kafka → Flink SQL anomaly detection → streaming agent → pit decisions</figcaption>
+      </figure>
+    </div>
+  </details>
+
+  <details class="more">
+    <summary>On the platform team?</summary>
+    <div class="more-body">
+      <p>The required infrastructure and resources are created with the
+      <a href="../../platform-team/README.md">Terraform module</a> in <code>platform-team/</code>.
+      This walkthrough is for the developers who use what it builds.</p>
+    </div>
+  </details>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ SIGN IN -->
+<article class="page" id="sign-in" data-title="Sign in and install" data-group="Get set up">
+  <h1>Sign in and install</h1>
+  <p class="lead">Check that your environment exists, then get three small tools onto your machine.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Sign in to Confluent Cloud</h3>
+      <p>Open the <a href="https://confluent.cloud" target="_blank" rel="noopener">Confluent Cloud Console</a> and sign in with your work email.
+      Open <strong>Environments</strong> and check that your environment is listed.</p>
+      <details class="more help">
+        <summary>Don't see your environment?</summary>
+        <div class="more-body">
+          <p>Ask your platform team before you go on. Your environment is usually named after your email,
+          for example <code>John-Doe-c21e_env</code>.</p>
+          <p>With SSO, the Console sends you to your organization's sign-in page first.</p>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Install the prerequisites</h3>
+      <p>Skip this if you already have git, uv and the Confluent CLI.</p>
+      <div class="tabs" data-tabs="os">
+        <div class="tab-list" role="tablist">
+          <button type="button" role="tab" data-tab="mac">macOS</button>
+          <button type="button" role="tab" data-tab="windows">Windows</button>
+        </div>
+        <div class="tab-panel" data-tab="mac">
+          <div class="code" data-lang="bash"><pre><code>
+brew install git uv
+brew install --cask confluent-cli
+</code></pre></div>
+        </div>
+        <div class="tab-panel" data-tab="windows">
+          <div class="code" data-lang="powershell"><pre><code>
+winget install --id Git.Git -e
+winget install --id astral-sh.uv -e
+</code></pre></div>
+          <p>The Confluent CLI has no reliable winget package. Download the latest
+          <code>confluent_*_windows_amd64.zip</code> from the
+          <a href="https://github.com/confluentinc/cli/releases/latest" target="_blank" rel="noopener">Confluent CLI releases</a>,
+          unzip it, and add the folder containing <code>confluent.exe</code> to your <code>PATH</code>.
+          Then close and reopen the terminal so every tool is on your <code>PATH</code>.</p>
+        </div>
+      </div>
+    </li>
+
+    <li>
+      <h3>Clone the repo</h3>
+      <div class="code" data-lang="bash"><pre><code>
+git clone https://github.com/confluentinc/demo-confluent-intelligence-f1.git
+cd demo-confluent-intelligence-f1
+</code></pre></div>
+    </li>
+
+    <li>
+      <h3>Sign in to the Confluent CLI</h3>
+      <p>In the same terminal, sign in with your work email:</p>
+      <div class="code" data-lang="bash"><pre><code>
+confluent login
+</code></pre></div>
+      <details class="more">
+        <summary>Why the CLI needs you signed in</summary>
+        <div class="more-body">
+          <p>With SSO, <code>confluent login</code> opens your organization's sign-in page in your browser.
+          The next step uses this session to create your Global API key as you.</p>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      You can see your environment in the Console, and <code>confluent login</code> finished without errors.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ CONNECT -->
+<article class="page" id="connect" data-title="Connect to your environment" data-group="Get set up">
+  <h1>Connect to your environment</h1>
+  <p class="lead">One command creates your API keys and writes them to a credential card on your machine.
+  Nothing else in your environment changes.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Run the deploy</h3>
+      <div class="code" data-lang="bash"><pre><code>
+uv run deploy --track pre-provisioned
+</code></pre></div>
+    </li>
+
+    <li>
+      <h3>Answer its questions</h3>
+      <dl class="prompts">
+        <div>
+          <dt><code>Continue?</code></dt>
+          <dd>Press <kbd>Enter</kbd>. The summary above it says the deploy creates your keys and nothing else, except the <code>driver_race_history</code> rows if they're missing.</dd>
+        </div>
+        <div>
+          <dt><code>Deploy into &lt;name&gt; (&lt;id&gt;)?</code></dt>
+          <dd>Check that <code>&lt;name&gt;</code> is the environment your platform team gave you, then press <kbd>Enter</kbd>.</dd>
+        </div>
+        <div>
+          <dt><code>Start the Pit Wall dashboard in the background now?</code></dt>
+          <dd>Press <kbd>Enter</kbd> to start it at <a href="http://localhost:8000" target="_blank" rel="noopener">localhost:8000</a>, or answer <code>n</code> to start it later.</dd>
+        </div>
+      </dl>
+      <details class="more help">
+        <summary>Two questions you might also see</summary>
+        <div class="more-body">
+          <ul>
+            <li><code>Your email (the one you sign in to Confluent Cloud with)</code> — asked only if Confluent Cloud doesn't return your email. Enter your work email.</li>
+            <li><code>Which one is yours?</code> — if you can see several environments and none is named after your email, you get a numbered list instead of <code>Deploy into …?</code>.</li>
+          </ul>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <details class="more">
+    <summary>What it creates</summary>
+    <div class="more-body">
+      <p>Three API keys for your account:</p>
+      <ol>
+        <li>a Global key (with the Confluent CLI)</li>
+        <li>a Kafka key</li>
+        <li>a Schema Registry key</li>
+      </ol>
+      <p>It writes them to your credential card, <code>runs/pre-provisioned/credentials/DEMO.env</code>.
+      Your Global key acts with all of your permissions, so keep the card private.</p>
+      <p>Running the deploy again reuses your card while its keys still work, so it creates nothing new.</p>
+    </div>
+  </details>
+
+  <details class="more">
+    <summary>What you'll see while it runs</summary>
+    <div class="more-body">
+      <p>Between prompts it prints what it finds: <code>User: u-…</code>, your email,
+      <code>Environment: &lt;name&gt; (&lt;id&gt;)</code>, then the cluster, compute pool and Schema Registry
+      your platform team built.</p>
+      <p>New keys take a minute or two to become active, so expect a couple of short waits.
+      Before it finishes, it checks that <code>driver_race_history</code> holds its 198 rows.</p>
+    </div>
+  </details>
+
+  <details class="more fix">
+    <summary>Troubleshooting the deploy</summary>
+    <div class="more-body">
+      <ul>
+        <li><strong><code>Error: Not logged into Confluent Cloud.</code></strong> Your Confluent CLI session is missing or has expired. Run <code>confluent login</code>, then the deploy again.</li>
+        <li><strong><code>Confluent Cloud refused a new Global key</code></strong> Each account can hold 2 Global keys. Delete one you no longer use in the Console under <strong>API keys</strong> → <strong>My account</strong>, then run the deploy again.</li>
+        <li><strong><code>Your Global key sees no environment you're directly bound to.</code></strong> Ask your platform team for a direct EnvironmentAdmin role binding on your user. A binding through an SSO group mapping isn't enough, because API keys don't carry group-mapped permissions. If you belong to several Confluent Cloud organizations, the deploy lists them: run <code>confluent login --organization &lt;id&gt;</code> for the right one, then the deploy again.</li>
+        <li><strong><code>Your platform team hasn't provisioned &lt;name&gt; (&lt;id&gt;) yet</code></strong> Send them the environment ID it names, and run the deploy again once they're done.</li>
+        <li><strong><code>driver_race_history holds N rows, expected 198</code></strong> Ask your platform team to rebuild the table (their guide shows how), then run the deploy again.</li>
+        <li><strong>A wait that times out, or <code>could not reach the Confluent Cloud API</code></strong> Run the deploy again. A run that stops before writing your card deletes the keys it created, so retrying never uses up your Global-key slots.</li>
+      </ul>
+    </div>
+  </details>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      The deploy printed a link to your Flink SQL workspace, your catalog and your database.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ CAR STATE -->
+<article class="page" id="car-state" data-title="Detect tire anomalies" data-group="Build the pit wall">
+  <h1>Detect tire anomalies</h1>
+  <p class="lead">Create a <code>car_state</code> table that joins telemetry with race standings in 20-second windows
+  and flags abnormal front-left tire temperatures with the built-in <code>ML_DETECT_ANOMALIES</code> function.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Open your SQL workspace</h3>
+      <p>Open the <a href="https://confluent.cloud/workspaces/" target="_blank" rel="noopener">SQL workspace</a>,
+      or the link your deploy printed, and select:</p>
+      <dl class="kv">
+        <dt>Catalog</dt><dd>your environment, e.g. <code>John-Doe-c21e_env</code></dd>
+        <dt>Database</dt><dd><code>RIVER-RACING-DEMO-CLUSTER</code></dd>
+      </dl>
+    </li>
+
+    <li>
+      <h3>Look at your source tables</h3>
+      <div class="code" data-lang="sql"><pre><code>
+SHOW TABLES;
+</code></pre></div>
+      <details class="more">
+        <summary>What's in each table</summary>
+        <div class="more-body">
+          <table>
+            <thead><tr><th>Table</th><th>Source</th><th>Format</th></tr></thead>
+            <tbody>
+              <tr><td><code>car_telemetry</code></td><td>Race simulator — car #88 sensors, every 2s</td><td>Avro</td></tr>
+              <tr><td><code>race_standings</code></td><td>Race simulator — all 22 cars, keyed by <code>car_number</code> (upsert)</td><td>Avro</td></tr>
+              <tr><td><code>driver_race_history</code></td><td>198 historical race rows seeded by your platform team</td><td>Avro</td></tr>
+            </tbody>
+          </table>
+          <p>Check the history and the pre-deployed model too:</p>
+          <div class="code" data-lang="sql"><pre><code>
+SELECT COUNT(*) FROM driver_race_history;
+
+SHOW MODELS;
+</code></pre></div>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Create <code>car_state</code></h3>
+      <p>Paste this into one SQL cell and run it. Wait for it to show <strong>Running</strong>, and leave it running for the rest of the workshop.</p>
+      <div class="code" data-lang="sql"><pre><code>
+CREATE TABLE `car_state` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
+WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings` /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ FOR SYSTEM_TIME AS OF t.event_time AS r ON t.car_number = r.car_number
+),
+windowed AS (
+  SELECT
+    window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+    AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+    AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+    AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+    AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+    AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+    AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+    MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+    MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+  FROM TABLE(TUMBLE(TABLE enriched, DESCRIPTOR(event_time), INTERVAL '20' SECOND))
+  GROUP BY window_start, window_end, window_time, car_number
+),
+anomaly AS (
+  SELECT *,
+    ML_DETECT_ANOMALIES(tire_temp_fl_c, window_time,
+      JSON_OBJECT('minTrainingSize' VALUE 12, 'maxTrainingSize' VALUE 50, 'confidencePercentage' VALUE 99.99, 'enableStl' VALUE FALSE))
+      OVER (PARTITION BY car_number ORDER BY window_time RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS anomaly_tire_temp_fl_result
+  FROM windowed
+)
+SELECT
+  car_number, lap,
+  tire_temp_fl_c, tire_temp_fr_c, tire_temp_rl_c, tire_temp_rr_c,
+  tire_pressure_fl_psi, tire_pressure_fr_psi, tire_pressure_rl_psi, tire_pressure_rr_psi,
+  engine_temp_c, brake_temp_fl_c, brake_temp_fr_c, battery_charge_pct, fuel_remaining_kg,
+  CASE
+    WHEN anomaly_tire_temp_fl_result.is_anomaly AND anomaly_tire_temp_fl_result.actual_value &gt; anomaly_tire_temp_fl_result.upper_bound THEN true
+    ELSE false
+  END AS anomaly_tire_temp_fl,
+  `position`, gap_to_ahead_sec, gap_to_leader_sec, pit_stops, tire_compound, tire_age_laps
+FROM anomaly
+WHERE lap &gt; 0;
+</code></pre></div>
+      <details class="more bulb">
+        <summary>How this query works</summary>
+        <div class="more-body">
+          <ul>
+            <li><strong><code>enriched</code></strong> joins each raw telemetry reading with the version of <code>race_standings</code> that was current at that moment (<code>FOR SYSTEM_TIME AS OF</code>). The join has to happen here, on the raw stream: after the window aggregation, the time column loses its event-time attribute and the join silently returns nothing.</li>
+            <li><strong><code>windowed</code></strong> averages the readings over 20-second tumbling windows — one window per lap.</li>
+            <li><strong><code>anomaly</code></strong> runs <code>ML_DETECT_ANOMALIES</code> over the front-left tire temperature. It needs 12 windows of history (<code>minTrainingSize</code>) before it can flag anything.</li>
+            <li>The final <code>SELECT</code> turns the result into a simple <code>anomaly_tire_temp_fl</code> true/false column, and <code>lap &gt; 0</code> drops the simulator's warm-up laps.</li>
+          </ul>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <div class="callout warn">
+    <p>Start the race only after <code>car_state</code> shows <strong>Running</strong>. Standings the simulator writes
+    before then are never read, and <code>car_state</code> loses its first laps.</p>
+  </div>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      <code>car_state</code> shows <strong>Running</strong> in your SQL workspace.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ RACE -->
+<article class="page" id="race" data-title="Start the race" data-group="Build the pit wall">
+  <h1>Start the race</h1>
+  <p class="lead">Lights out. The simulator streams car #88's sensors and all 22 cars' standings into your topics,
+  one lap every 20 seconds.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Start the simulator</h3>
+      <p>In your local terminal — and leave it running:</p>
+      <div class="code" data-lang="bash"><pre><code>
+uv run f1-race
+</code></pre></div>
+      <details class="more">
+        <summary>What happens during the race</summary>
+        <div class="more-body">
+          <p>Lap 1 starts on the next 20-second wall-clock boundary, so it can take up to 20 seconds to appear.</p>
+          <p><code>car_state</code> emits one row per 20-second window. After 12 windows (~4 minutes) it has enough
+          history to detect temperature anomalies on the front-left tire. At lap 24 the tire spikes to ~145°C and
+          <code>anomaly_tire_temp_fl</code> becomes <code>true</code>.</p>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Open the Pit Wall dashboard</h3>
+      <p>If you said yes at the end of the deploy, it's already running at
+      <a href="http://localhost:8000" target="_blank" rel="noopener">localhost:8000</a>. Otherwise, start it in a second terminal:</p>
+      <div class="code" data-lang="bash"><pre><code>
+uv run f1-pitwall
+</code></pre></div>
+      <figure>
+        <img src="../assets/self-service/pitwall-nominal.png" alt="Pit Wall dashboard showing a nominal front-left tire temperature">
+        <figcaption>Track map, live leaderboard and car #88's gauges. More panels unlock as you build.</figcaption>
+      </figure>
+    </li>
+
+    <li>
+      <h3>Watch <code>car_state</code> fill up</h3>
+      <p>In a new SQL cell:</p>
+      <div class="code" data-lang="sql"><pre><code>
+SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_temp_fl, tire_temp_fl_c
+FROM `car_state`;
+</code></pre></div>
+    </li>
+  </ol>
+
+  <details class="more fix">
+    <summary><code>car_state</code> is empty at first</summary>
+    <div class="more-body">
+      <p><code>car_state</code> emits one row per 20-second window, and <code>f1-race</code> aligns lap 1 to the next
+      20-second wall-clock boundary before starting. Make sure <code>car_state</code> is <strong>Running</strong>
+      before starting <code>uv run f1-race</code>.</p>
+    </div>
+  </details>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      A new <code>car_state</code> row appears every lap, and the dashboard's <strong>Anomaly Detection</strong> panel has unlocked.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ AGENT -->
+<article class="page" id="agent" data-title="Create the strategy agent" data-group="Build the pit wall">
+  <h1>Create the strategy agent</h1>
+  <p class="lead">With <code>car_state</code> streaming, create <code>pit_strategy_agent</code> to weigh car condition and
+  race context on every lap and recommend one of three calls.</p>
+
+  <div class="pills">
+    <span class="pill stay">STAY OUT</span>
+    <span class="pill soon">PIT SOON</span>
+    <span class="pill now">PIT NOW</span>
+  </div>
+
+  <ol class="steps">
+    <li>
+      <h3>Create the agent</h3>
+      <p>Paste and run this in your SQL workspace:</p>
+      <div class="code" data-lang="sql"><pre><code>
+CREATE AGENT `pit_strategy_agent`
+USING MODEL `llm_textgen_model`
+USING PROMPT 'OUTPUT FORMAT — respond with exactly these 7 labeled lines in this order. Plain text only, no markdown or bold.
+
+Suggestion: [PIT NOW | PIT SOON | STAY OUT]
+Condition Summary: [one sentence describing current car condition]
+Race Context: [one sentence on race situation]
+Recommended Compound: [SOFT | MEDIUM | HARD | N/A if STAY OUT]
+Recommended Stint Laps: [integer expected laps on new tires | N/A if STAY OUT]
+Recommended Reason: [one sentence explaining compound choice | N/A if STAY OUT]
+Reasoning: [2-4 sentences full explanation of your decision]
+
+Correct STAY OUT example:
+Suggestion: STAY OUT
+Condition Summary: Front-left tire temperature is nominal at 107C with 18 laps of age on SOFT compound.
+Race Context: Currently P3. Leader is 8.2s ahead.
+Recommended Compound: N/A
+Recommended Stint Laps: N/A
+Recommended Reason: N/A
+Reasoning: No anomaly has been detected, so tire temps and pressures are within normal operating windows for this stage of the stint. Track position P3 is strong and pitting now would surrender 4-6 seconds.
+
+Correct PIT NOW example:
+Suggestion: PIT NOW
+Condition Summary: Front-left tire temperature anomaly at 145C, 20C above expected upper bound — failure risk imminent.
+Race Context: Currently P8 with 36 laps remaining.
+Recommended Compound: MEDIUM
+Recommended Stint Laps: 36
+Recommended Reason: Mediums will carry John to the flag across the remaining 36 laps and give him the pace to recover positions lost during the stop.
+Reasoning: The FL anomaly flag indicates the SOFT has gone past its operating limit with blowout risk. Pitting now onto mediums avoids tire failure. Based on historical data, John averages +2.75 positions on SOFT-MEDIUM — this is his strongest strategy.
+
+---
+
+You are the AI pit wall strategist for River Racing at the 2026 British Grand Prix (Silverstone, 60 laps). Driver: John Doe, Car #88.
+
+DECISION FRAMEWORK — weigh these in priority order:
+1. Anomaly signal: anomaly_tire_temp_fl comes from a trained statistical anomaly detector (ML_DETECT_ANOMALIES) that evaluates tire_temp_fl_c against expected bounds. PIT NOW is reserved for this signal being true — treat it as validated evidence of a real tire problem requiring an immediate stop. When it is false, a raw temperature reading that merely looks high is still within expected bounds for the stint. Nothing else in this input — not tire age, not race context, not competitor behavior — should produce PIT NOW; those inform PIT SOON or STAY OUT instead.
+2. Pit history: a car that has already pitted this race should usually stay out and run its current tires to the end, absent a new anomaly.
+3. Tire age and compound: a SOFT tire past ~20 laps enters its strategic pit window. Call PIT SOON (never PIT NOW) throughout this window when no anomaly is flagged.
+4. Otherwise: default to STAY OUT.
+
+STRICT OUTPUT VALUES — the Suggestion line must be the exact literal string PIT NOW, PIT SOON, or STAY OUT with no extra text. For STAY OUT, write N/A for Recommended Compound, Recommended Stint Laps, and Recommended Reason.
+
+TIRE STRATEGY at Silverstone (60-lap race):
+- SOFT: Optimal laps 1-19; degrades in laps 20-22 (PIT SOON window), no failure risk unless the anomaly sensor fires.
+- MEDIUM: Best for a 30-40 lap second stint after SOFT (clean 1-stop).
+- HARD: Durable but slow; only for 40+ lap stints.
+- John Doe historical best: SOFT -&gt; MEDIUM 1-stop averages +2.75 positions over 4 prior races.'
+WITH ('max_iterations' = '10');
+</code></pre></div>
+      <details class="more bulb">
+        <summary>What's in the prompt</summary>
+        <div class="more-body">
+          <ul>
+            <li><strong>An output format</strong> of seven labeled lines, with one worked example for <code>STAY OUT</code> and one for <code>PIT NOW</code>. The next step parses these lines into columns.</li>
+            <li><strong>A decision framework</strong> in priority order: the anomaly signal first (the only thing allowed to produce <code>PIT NOW</code>), then pit history, then tire age and compound, otherwise stay out.</li>
+            <li><strong>Silverstone tire strategy</strong> and John Doe's historical best — SOFT → MEDIUM, one stop.</li>
+          </ul>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Confirm it's registered</h3>
+      <div class="code" data-lang="sql"><pre><code>
+SHOW AGENTS;
+</code></pre></div>
+    </li>
+  </ol>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      <code>pit_strategy_agent</code> is listed by <code>SHOW AGENTS</code>.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ DECISIONS -->
+<article class="page" id="decisions" data-title="Stream pit decisions" data-group="Build the pit wall">
+  <h1>Stream pit decisions</h1>
+  <p class="lead">Create <code>pit_decisions</code>, which asks the agent for a call on every <code>car_state</code> row and
+  splits its answer into columns.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Create <code>pit_decisions</code></h3>
+      <p>Run this in your SQL workspace, and leave it running:</p>
+      <div class="code" data-lang="sql"><pre><code>
+CREATE TABLE `pit_decisions` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
+SELECT
+  cs.car_number, cs.lap, cs.`position`,
+  cs.tire_compound AS tire_compound_current, cs.tire_age_laps, cs.anomaly_tire_temp_fl,
+  TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Suggestion:\*{0,2}\s*([^\n]+)', 1)) AS suggestion,
+  TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Condition Summary:\*{0,2}\s*([^\n]+)', 1)) AS condition_summary,
+  TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Race Context:\*{0,2}\s*([^\n]+)', 1)) AS race_context,
+  NULLIF(TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Recommended Compound:\*{0,2}\s*([^\n]+)', 1)), 'N/A') AS recommended_tire_compound,
+  CAST(NULLIF(TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Recommended Stint Laps:\*{0,2}\s*([^\n]+)', 1)), 'N/A') AS INT) AS recommended_stint_laps,
+  NULLIF(TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Recommended Reason:\*{0,2}\s*([^\n]+)', 1)), 'N/A') AS recommended_reason,
+  TRIM(REGEXP_EXTRACT(CAST(response AS STRING), '\*{0,2}Reasoning:\*{0,2}\s*([\s\S]+?)$', 1)) AS reasoning,
+  CAST(response AS STRING) AS raw_response
+FROM `car_state` /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ cs,
+LATERAL TABLE(AI_RUN_AGENT(
+  `pit_strategy_agent`,
+  CONCAT(
+    'CAR STATE — Lap ', CAST(cs.lap AS STRING), ' of 60 | Silverstone British Grand Prix\n',
+    'Driver: John Doe (#', CAST(cs.car_number AS STRING), ') | Current Position: P', CAST(cs.`position` AS STRING), '\n',
+    '\nTIRE DATA:\n',
+    '  Compound: ', cs.tire_compound, ' | Age: ', CAST(cs.tire_age_laps AS STRING), ' laps\n',
+    '  FL Temp: ', CAST(ROUND(cs.tire_temp_fl_c, 1) AS STRING), 'C  FR: ', CAST(ROUND(cs.tire_temp_fr_c, 1) AS STRING), 'C  RL: ', CAST(ROUND(cs.tire_temp_rl_c, 1) AS STRING), 'C  RR: ', CAST(ROUND(cs.tire_temp_rr_c, 1) AS STRING), 'C\n',
+    '  FL Pressure: ', CAST(ROUND(cs.tire_pressure_fl_psi, 1) AS STRING), 'psi  FR: ', CAST(ROUND(cs.tire_pressure_fr_psi, 1) AS STRING), 'psi  RL: ', CAST(ROUND(cs.tire_pressure_rl_psi, 1) AS STRING), 'psi  RR: ', CAST(ROUND(cs.tire_pressure_rr_psi, 1) AS STRING), 'psi\n',
+    '  FL Tire Anomaly Detected: ', CAST(cs.anomaly_tire_temp_fl AS STRING), '\n',
+    '\nCAR SYSTEMS:\n',
+    '  Engine Temp: ', CAST(ROUND(cs.engine_temp_c, 1) AS STRING), 'C  Brake FL: ', CAST(ROUND(cs.brake_temp_fl_c, 1) AS STRING), 'C  Brake FR: ', CAST(ROUND(cs.brake_temp_fr_c, 1) AS STRING), 'C\n',
+    '  Battery: ', CAST(ROUND(cs.battery_charge_pct, 1) AS STRING), '%  Fuel Remaining: ', CAST(ROUND(cs.fuel_remaining_kg, 1) AS STRING), 'kg\n',
+    '\nRACE CONTEXT:\n',
+    '  Gap to Leader: ', CAST(ROUND(cs.gap_to_leader_sec, 2) AS STRING), 's  Gap to Car Ahead: ', CAST(ROUND(cs.gap_to_ahead_sec, 2) AS STRING), 's\n',
+    '  Pit Stops Taken: ', CAST(cs.pit_stops AS STRING), '\n',
+    '  Laps Remaining: ', CAST(60 - cs.lap AS STRING)
+  ),
+  MAP['debug', 'true']
+));
+</code></pre></div>
+      <details class="more bulb">
+        <summary>How this query works</summary>
+        <div class="more-body">
+          <ul>
+            <li><a href="https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html#ai-run-agent" target="_blank" rel="noopener"><code>AI_RUN_AGENT</code></a> calls <code>pit_strategy_agent</code> once per <code>car_state</code> row, with a plain-text briefing built by <code>CONCAT</code>.</li>
+            <li>Each <code>REGEXP_EXTRACT</code> pulls one of the agent's seven labeled lines into its own column; <code>raw_response</code> keeps the whole answer for debugging.</li>
+            <li>It reads <code>car_state</code> from <code>earliest-offset</code>, so it also processes laps that have already arrived.</li>
+          </ul>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <details class="more fix">
+    <summary>Agent fields are null but <code>raw_response</code> has text</summary>
+    <div class="more-body">
+      <p>Inspect a few rows:</p>
+      <div class="code" data-lang="sql"><pre><code>
+SELECT lap, suggestion, raw_response FROM pit_decisions LIMIT 5;
+</code></pre></div>
+      <p>If <code>raw_response</code> is empty across the board, the agent's Confluent-hosted model isn't answering:
+      ask your platform team to check that it's offered in your organization's region.</p>
+    </div>
+  </details>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      <code>pit_decisions</code> shows <strong>Running</strong>, and the dashboard's <strong>AI Pit Strategist</strong> panel has unlocked.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ RESULTS -->
+<article class="page" id="results" data-title="Review the race" data-group="Build the pit wall">
+  <h1>Review the race</h1>
+  <p class="lead">Watch the agent's calls change as the tires age — and see it react the moment the anomaly fires at lap 24.</p>
+
+  <div class="race" aria-hidden="true">
+    <div class="race-bar">
+      <span class="seg-stay" style="flex:18"></span>
+      <span class="seg-soon" style="flex:5"></span>
+      <span class="seg-now" style="flex:1"></span>
+      <span class="seg-stay" style="flex:36"></span>
+    </div>
+    <div class="race-scale">
+      <span style="left:0">Lap 1</span>
+      <span class="mark" style="left:39.2%">24</span>
+      <span style="right:0">60</span>
+    </div>
+  </div>
+
+  <div class="laps">
+    <div class="lap"><span class="n">1–18</span><span><span class="pill stay">STAY OUT</span></span><span class="pos">P3 → P1</span><span class="what">Competitive, nominal tire temps</span></div>
+    <div class="lap"><span class="n">~19–23</span><span><span class="pill soon">PIT SOON</span></span><span class="pos">P1 → P8</span><span class="what">Aging SOFTs enter the strategic pit window</span></div>
+    <div class="lap key"><span class="n">24</span><span><span class="pill now">PIT NOW</span></span><span class="pos">P8</span><span class="what">Front-left anomaly (~145°C) triggers an immediate stop</span></div>
+    <div class="lap"><span class="n">25–60</span><span><span class="pill stay">STAY OUT</span></span><span class="pos">P14 → P1–P2</span><span class="what">Recovery stint to the flag on fresh MEDIUMs</span></div>
+  </div>
+  <p style="font-size:.88rem;color:var(--muted)"><code>PIT SOON</code> can start anywhere from about lap 19 to 23. The exact laps vary by run.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>See every call</h3>
+      <div class="code" data-lang="sql"><pre><code>
+SELECT lap, `position`, suggestion, condition_summary, reasoning
+FROM `pit_decisions`;
+</code></pre></div>
+      <details class="more image">
+        <summary>What it looks like</summary>
+        <div class="more-body">
+          <figure><img src="../assets/self-service/pit-decisions-query.png" alt="Flink SQL workspace showing pit_decisions results progressing from PIT SOON to PIT NOW"></figure>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Inspect the lap 24 pit call</h3>
+      <div class="code" data-lang="sql"><pre><code>
+SELECT lap, `position`, tire_compound_current, tire_age_laps, anomaly_tire_temp_fl,
+       suggestion, recommended_tire_compound, recommended_stint_laps, reasoning
+FROM `pit_decisions`
+WHERE anomaly_tire_temp_fl = true;
+</code></pre></div>
+      <details class="more image">
+        <summary>What it looks like</summary>
+        <div class="more-body">
+          <figure><img src="../assets/self-service/pit-decisions-anomaly-query.png" alt="Flink SQL workspace showing the lap 24 PIT NOW row with the agent's full reasoning"></figure>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <figure>
+    <img src="../assets/self-service/pitwall-pit-now.png" alt="Pit Wall dashboard with both Anomaly Detection and AI Pit Strategist panels unlocked, showing the PIT NOW call at lap 24">
+    <figcaption>Both panels unlocked: the anomaly at lap 24 and the agent's PIT NOW call.</figcaption>
+  </figure>
+
+  <details class="more fix">
+    <summary>No anomaly around lap 24</summary>
+    <div class="more-body">
+      <p><code>ML_DETECT_ANOMALIES</code> needs 12 windows of context (<code>minTrainingSize = 12</code>) before lap 24.
+      If <code>car_state</code> was started mid-race after lap 12, <a href="#finish">reset</a> and start
+      <code>car_state</code> before <code>uv run f1-race</code>.</p>
+    </div>
+  </details>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      You found the <code>PIT NOW</code> call at lap 24. That's the core workshop done.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ RTCE -->
+<article class="page" id="rtce" data-title="Real-Time Context Engine" data-group="Go further" data-optional>
+  <h1>Ask your coding agent about the race</h1>
+  <p class="lead">The Real-Time Context Engine exposes a Kafka topic as an MCP tool, so any MCP-compatible
+  agent can query the live stream.</p>
+
+  <div class="callout">
+    <p>If your platform team tells you the Real-Time Context Engine isn't available in your region, skip this
+    page and both challenges.</p>
+  </div>
+
+  <ol class="steps">
+    <li>
+      <h3>Enable it on <code>car_telemetry</code></h3>
+      <p>Under your environment's cluster, open <a href="https://confluent.cloud/go/topics" target="_blank" rel="noopener"><strong>Topics</strong></a>
+      → <code>car_telemetry</code>, open the <strong>Real-Time Context Engine</strong> panel and click <strong>Enable</strong>
+      (or <strong>Turn on</strong>).</p>
+      <details class="more image">
+        <summary>What it looks like</summary>
+        <div class="more-body">
+          <p>Once enabled, the <strong>Topics</strong> list shows Real-Time Context Engine <strong>On</strong>:</p>
+          <figure><img src="../assets/self-service/rtce-topics-list.png" alt="Topics list with the Real-Time Context Engine column"></figure>
+          <p>The panel shows the environment, cluster, cloud and region an MCP client uses to reach it:</p>
+          <figure><img src="../assets/self-service/rtce-enabled.png" alt="Real-Time Context Engine enabled for car_telemetry"></figure>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Point your coding agent at it</h3>
+      <div class="code" data-lang="bash"><pre><code>
+uv run setup-rtce
+</code></pre></div>
+      <p>This registers it as an MCP server with Claude Code (or prints a config snippet for Codex CLI). Restart your coding agent afterwards.</p>
+      <details class="more">
+        <summary>Where the key comes from</summary>
+        <div class="more-body">
+          <p>It uses the <code>F1_RTCE_MCP_ENDPOINT</code>, <code>F1_RTCE_API_KEY</code> and <code>F1_RTCE_API_SECRET</code>
+          fields on your credential card. The RTCE key is the Global key your deploy created, so
+          <code>setup-rtce</code> doesn't ask for another one.</p>
+        </div>
+      </details>
+    </li>
+
+    <li>
+      <h3>Ask questions in plain English</h3>
+      <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+What topics do I have access to in the Real-Time Context Engine?
+</code></pre></div>
+      <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+How has the engine temperature been trending over the last few laps?
+</code></pre></div>
+      <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+What's the front-left tire temperature on car 88 right now?
+</code></pre></div>
+      <details class="more image">
+        <summary>Example answers</summary>
+        <div class="more-body">
+          <figure><img src="../assets/hosted/rtce-listtopics.png" alt="Claude listing the topics enabled in the Real-Time Context Engine"></figure>
+          <figure><img src="../assets/self-service/rtce-engine-trend.png" alt="Claude answering how the engine temperature has trended over the last few laps by calling the Real-Time Context Engine"></figure>
+          <figure><img src="../assets/hosted/rtce-cartemp.png" alt="Claude answering the front-left tire temperature question by calling the Real-Time Context Engine"></figure>
+        </div>
+      </details>
+      <details class="more">
+        <summary>More questions to try</summary>
+        <div class="more-body">
+          <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+At what lap in the race does the engine temperature peak?
+</code></pre></div>
+          <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+What is the front right tire temperature at lap 30?
+</code></pre></div>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Checkpoint</span>
+      Your coding agent answers with numbers from the live race.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ CHALLENGE 1 -->
+<article class="page" id="challenge-social" data-title="Challenge: social media agent" data-group="Go further" data-optional>
+  <h1>Challenge: write the race post</h1>
+  <p class="lead">Switch gears: you're River Racing's social media team. Use the live race data through
+  the Real-Time Context Engine to draft an engaging post.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Enable two more topics</h3>
+      <p>Enable the Real-Time Context Engine on <code>car_state</code> and <code>pit_decisions</code> in the Console,
+      <a href="#rtce">the same way</a> you enabled <code>car_telemetry</code>.</p>
+    </li>
+    <li>
+      <h3>Give your agent a persona</h3>
+      <p>Write a persona prompt that helps it produce an engaging social media post.</p>
+    </li>
+    <li>
+      <h3>Draft a post from live data</h3>
+      <p>Try one of these:</p>
+      <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+We just made a big move — write a post celebrating it.
+</code></pre></div>
+      <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+The pit wall just made a call. Draft a post about our strategy.
+</code></pre></div>
+      <div class="code" data-lang="text" data-where="Ask your agent"><pre><code>
+Write a 3-tweet recap thread of John's race so far.
+</code></pre></div>
+    </li>
+  </ol>
+
+  <details class="more help">
+    <summary>The agent says the feed is quiet</summary>
+    <div class="more-body">
+      <p>The race may not be running yet, or the Real-Time Context Engine isn't enabled on one of the two topics.</p>
+    </div>
+  </details>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Success looks like</span>
+      Claude calls <code>queryData</code> against <code>car_state</code> and <code>pit_decisions</code> and drafts a post citing
+      the real lap number, position and strategy call — not invented numbers.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ CHALLENGE 2 -->
+<article class="page" id="challenge-lightning" data-title="Challenge: Lightning Queries" data-group="Go further" data-optional>
+  <h1>Challenge: query the race at lightning speed</h1>
+  <p class="lead">Lightning Queries read a Real-Time Context Engine topic over low-latency REST.
+  Find out what the agent recommended at lap 24, and why.</p>
+
+  <div class="callout warn">
+    <p>Lightning Queries must be enabled for your Confluent organization. If <code>uv run setup-rtce --lightning</code>
+    reports <code>api_not_enabled</code>, skip this challenge and ask your instructor.</p>
+  </div>
+
+  <ol class="steps">
+    <li>
+      <h3>Print a ready-to-run query</h3>
+      <p>Make sure the Real-Time Context Engine is on for <code>car_telemetry</code>, then from the repo directory:</p>
+      <div class="code" data-lang="bash"><pre><code>
+uv run setup-rtce --lightning
+</code></pre></div>
+      <p>Copy the printed <code>curl</code> command into your terminal and run it. It returns the last 10 telemetry rows
+      by lap; edit the SQL in <code>query</code> to filter for car 88 or select other columns.</p>
+    </li>
+    <li>
+      <h3>Your challenge</h3>
+      <p>Enable the Real-Time Context Engine on <code>pit_decisions</code> in the Console. Then edit the <code>curl</code>
+      command's <code>query</code> to find out what tire compound the agent recommended on lap 24, and why.</p>
+      <details class="more bulb">
+        <summary>Hint</summary>
+        <div class="more-body">
+          <div class="code" data-lang="sql"><pre><code>
+SELECT lap, &lt;column&gt;, &lt;column&gt; FROM pit_decisions WHERE lap = 24 LIMIT 1
+</code></pre></div>
+          <p>Fill in the first <code>&lt;column&gt;</code> with the recommended tire compound, and the second with the
+          agent's reasoning for that call.</p>
+        </div>
+      </details>
+    </li>
+  </ol>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Success looks like</span>
+      Your <code>curl</code> returns the lap 24 row with the recommended compound and the agent's reason.</div>
+  </div>
+</article>
+
+<!-- ═══════════════════════════════════════════════════════ FINISH -->
+<article class="page" id="finish" data-title="Run it again or tear down" data-group="Wrap up">
+  <h1>Run it again, or tear it down</h1>
+  <p class="lead">Stop <code>f1-race</code> with <kbd>Ctrl</kbd>+<kbd>C</kbd> when you finish. Then pick one.</p>
+
+  <div class="paths">
+    <a href="#again"><strong>Run it again</strong><span>Erase the race and repeat the workshop from a clean slate.</span></a>
+    <a href="#teardown"><strong>Tear it down</strong><span>Delete your API keys and credential card.</span></a>
+  </div>
+
+  <h2 id="again">Run it again</h2>
+  <div class="code" data-lang="bash"><pre><code>
+uv run reset
+</code></pre></div>
+  <p>Then recreate <code>car_state</code>, wait for it to show <strong>Running</strong>, and start <code>uv run f1-race</code> again.</p>
+  <details class="more">
+    <summary>Skip the SQL with <code>--with-labs</code></summary>
+    <div class="more-body">
+      <p><code>uv run reset --with-labs</code> rebuilds <code>car_state</code>, <code>pit_strategy_agent</code> and
+      <code>pit_decisions</code> for you. Start <code>uv run f1-race</code> once it finishes.</p>
+    </div>
+  </details>
+  <details class="more help">
+    <summary>It asks me to sign in</summary>
+    <div class="more-body">
+      <p><code>reset</code> uses your Confluent CLI session from <a href="#sign-in">the sign-in step</a>. If that session has
+      expired, it asks you to sign in; with SSO, press <kbd>Enter</kbd> at the email prompt and accept the single sign-on login.</p>
+    </div>
+  </details>
+
+  <h2 id="teardown">Tear it down</h2>
+  <div class="code" data-lang="bash"><pre><code>
+uv run destroy
+</code></pre></div>
+  <p>It lists the three API keys the deploy created, asks you to confirm, then deletes them — Global key last —
+  along with your credential card. Afterwards it asks whether to delete <code>credentials.env</code> too (default <strong>yes</strong>).</p>
+  <div class="callout">
+    <p>Your environment and everything in it stay: they belong to your platform team, who delete them afterwards.</p>
+  </div>
+  <details class="more fix">
+    <summary>It stopped partway, or my card is gone</summary>
+    <div class="more-body">
+      <p>Run it again: it deletes only what's left. If your credential card is gone, or its Global key no longer works,
+      it lists the keys for you to delete in the Console under <strong>API keys</strong> → <strong>My account</strong>.</p>
+    </div>
+  </details>
+  <details class="more fix">
+    <summary><code>No credential card found</code> or <code>Multiple credential cards found</code></summary>
+    <div class="more-body">
+      <p>Pass <code>--creds runs/pre-provisioned/credentials/DEMO.env</code>, or re-run
+      <code>uv run deploy --track pre-provisioned</code> to refresh <code>F1_CARD</code> in <code>credentials.env</code>.</p>
+    </div>
+  </details>
+
+  <div class="checkpoint">
+    <div class="checkpoint-text"><span class="label">Finish line</span>
+      Thanks for racing with River Racing. <a href="../../README.md">Back to the main README</a></div>
+  </div>
+</article>
+
+<nav class="pager" id="pager" aria-label="Previous and next step"></nav>
+</main>
+
+<script src="site.js"></script>
+</body>
+</html>
