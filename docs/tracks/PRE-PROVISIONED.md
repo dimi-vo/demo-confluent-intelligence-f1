@@ -6,52 +6,44 @@
 >
 > Use this path when your organization's platform team has created a Confluent Cloud environment for you, made you its EnvironmentAdmin, and built the workshop inside it. You sign in with your own work account, connect to that environment as yourself (`uv run deploy --track pre-provisioned`), and run the race simulator on your machine.
 
-**On the platform team?** The required infrastructure and resources are created with the [Terraform module](../../platform-team/README.md) in `platform-team/`..
+**On the platform team?** The required infrastructure and resources are created with the [Terraform module](../../platform-team/README.md) in `platform-team/`.
 
-## 0. Sign in, install, and connect
+## 0. Setup – Do these steps before the workshop
 
-Your platform team already built the workshop's Kafka cluster, Flink compute pool, tables and AI model in an environment dedicated to you. 
+### 0.1 One week before the workshop
 
-You only need to create API keys for your own account and a credential card on your machine.
+Sign in to the [Confluent Cloud Console](https://confluent.cloud) with your work email. With SSO, the Console sends you to your organization's sign-in page.
 
-1. Sign in to the [Confluent Cloud Console](https://confluent.cloud) with your work email. With SSO, the Console sends you to your organization's sign-in page.
+> This is required for your user account to be registered under your company's organization and for your team to provision the infrastructure for you.
 
-    Open **Environments** and check that your environment is listed. If it isn't, ask your platform team before you go on.
+### 0.2 A couple days before the workshop
 
-2. Install the prerequisites, then clone the repo:
+Mac
 
-    **Prerequisites for your machine** — skip this step if they're already installed (click to expand)</summary>
+```bash
+brew install git uv
+brew install --cask confluent-cli
+```
 
-    <details>
-    <summary>for Mac</summary>
+<details>
+<summary>Windows </summary>
 
-    ```bash
-    brew install git uv
-    brew install --cask confluent-cli
-    ```
+```powershell
+winget install --id Git.Git -e
+winget install --id astral-sh.uv -e
+```
 
-    </details>
+The Confluent CLI has no reliable winget package. Download the latest `confluent_*_windows_amd64.zip` from the [Confluent CLI releases](https://github.com/confluentinc/cli/releases/latest), unzip it, and add the folder containing `confluent.exe` to your `PATH`. Then close and reopen the terminal so every tool is on your `PATH`.
 
-    <details>
-    <summary>for Windows</summary>
+</details>
 
-    ```powershell
-    winget install --id Git.Git -e
-    winget install --id astral-sh.uv -e
-    ```
+```bash
+git clone https://github.com/confluentinc/demo-confluent-intelligence-f1.git
+```
 
-    The Confluent CLI has no reliable winget package. Download the latest `confluent_*_windows_amd64.zip` from the [Confluent CLI releases](https://github.com/confluentinc/cli/releases/latest), unzip it, and add the folder containing `confluent.exe` to your `PATH`. Then close and reopen the terminal so every tool is on your `PATH`.
+### 0.3 On the day of the workshop
 
-    </details>
-
-    </details>
-
-    ```bash
-    git clone https://github.com/confluentinc/demo-confluent-intelligence-f1.git
-    cd demo-confluent-intelligence-f1
-    ```
-
-3. Sign in to the Confluent CLI in the same terminal:
+1. Explore your Confluent Cloud environment:
 
     ```bash
     confluent login
@@ -67,17 +59,21 @@ You only need to create API keys for your own account and a credential card on y
     confluent environment list
     ```
 
-    If you see multiple environments listed here, select the correct one for this workshop. Use the ID from the output of the previous command.
+    If you see multiple environments listed here, select the one provided to you for the workshop:
 
     ```bash
     confluent environment use env-abcd123
     ```
 
-    See the provisioned kafka clusters and select the default one.
+    See the provisioned kafka clusters.
 
     ```bash
     confluent kafka cluster list
+    ```
 
+    There should be just one in your environment. Set it as the default.
+
+    ```bash
     confluent kafka cluster use lkc-abcd123
     ```
 
@@ -87,9 +83,9 @@ You only need to create API keys for your own account and a credential card on y
     confluent kafka topic list
     ```
 
-    [!NOTE] The above operations are Control Plane operations; i.e. describing topics, clusters, or environments. If you try to consume data from a topic you will see `Error: no API key selected for resource "lkc-abcd123"`. Consuming data is a Data Plane operation. For such operations you need to authenticate against the Kafka cluster. We will create the required API keys in the next section.
+    > [!NOTE] The above operations are **Control Plane** operations; i.e. describing topics, clusters, or environments. If you try to consume data from a topic, e.g. `confluent kafka topic consume my-topic` you will see `Error: no API key selected for resource "lkc-abcd123"`. Consuming data is a **Data Plane** operation. For such operations you need to authenticate against the Kafka cluster. We will create the required API keys in the next section.
 
-4. Connect to your environment:
+2. Mint the keys:
 
     ```bash
     uv run deploy --track pre-provisioned
@@ -97,9 +93,9 @@ You only need to create API keys for your own account and a credential card on y
 
     It creates three API keys for your account:
 
-    1. a Global key (with the Confluent CLI)
-    2. a Kafka key
-    3. a Schema Registry key.
+    1. A Global API Key
+    2. A Kafka API Key
+    3. A Schema Registry API Key
 
     It writes them to your credential card, `runs/pre-provisioned/credentials/DEMO.env`.
 
@@ -110,7 +106,7 @@ You only need to create API keys for your own account and a credential card on y
     When the script finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. Running it again reuses your credential card while its keys still work, so it creates nothing new.
 
     <details>
-    <summary>Troubleshooting the deploy</summary>
+    <summary>Troubleshooting</summary>
 
     - **`Error: Not logged into Confluent Cloud.`** Your Confluent CLI session is missing or has expired. Run `confluent login`, then the deploy again.
     - **`Confluent Cloud refused a new Global key`.** Each account can hold 2 Global keys. Delete one you no longer use in the Console under **API keys** → **My account**, then run the deploy again.
@@ -123,29 +119,39 @@ You only need to create API keys for your own account and a credential card on y
 
 ## 1. Get familiar with Flink
 
+Go the [Confluent Cloud Console](https://confluent.cloud).
+
 ### 1.1 The Flink SQL Workspace
 
-A Flink SQL workspace is the browser-based SQL editor in the Confluent Cloud console. Navigate to your SQL workspace via the navigation on the left side. 
+A Flink SQL workspace is the browser-based SQL editor in the Confluent Cloud console.
 
-You need to create a new workspace.
+1. Open the [SQL workspace](https://confluent.cloud/workspaces/) page or use the navigation on the left side.
 
-A workspace does not incur any costs and it does not run any Flink jobs.
+    Click on `Create new workspace`.
 
-A compute pool represents the resources that are used to run Flink jobs. The compute pool has been provisioned for you by the platform team.
+    <button style="background-color: #1668dc; color: white; border: 0; border-radius: 6px; padding: 10px 16px; font-size: 14px;"><span>Create new workspace</span></button>
 
-Open the [SQL workspace](https://confluent.cloud/workspaces/) in the Confluent Cloud Console, or the link your deploy printed. Select **your environment** (for example `John-Doe-c21e_env`) as the **catalog** and `RIVER-RACING-DEMO-CLUSTER` as the **database**.
+    A workspace does not incur any costs and it does not run any Flink jobs.
 
-### 1.2 The integration of Kafka and Flink in Confluent
+    A compute pool represents the resources that are used to run Flink jobs. The compute pool has been provisioned for you by the platform team.
 
-| Kafka           | Flink     |
-|-----------------|-----------|
-| Environment     | Catalog   |
-| Cluster         | Database  |
-| Topic + Schema  | Table     |
+2. Configure the workspace
 
-![alt text](image2.png)
+    To simplify the statements later select the default `catalog` and `database` for your workspace.
 
-### 1.3 Explore the data
+    Click on the `Use catalog` and `Use database` dropdowns.
+
+    ![alt text](image2.png)
+
+    Kafka resources are available in Flink by default. The mapping between the Kafka and Flink resources is:
+
+    | Kafka           | Flink     |
+    |-----------------|-----------|
+    | Environment     | Catalog   |
+    | Cluster         | Database  |
+    | Topic + Schema  | Table     |
+
+### 1.2 Data exploration
 
 Explore the pre-deployed source tables.
 
@@ -160,7 +166,7 @@ SHOW TABLES;
 | `driver_race_history` | 198 historical race rows seeded by your platform team         | Avro    |
 
 ```SQL
-describe `driver_race_history`;
+DESCRIBE `driver_race_history`;
 ```
 
 Make sure that the driver_race_history topic is populated. It should have 198 rows.
@@ -182,7 +188,11 @@ select driver, `gp_name` from `driver_race_history`
 where `finishing_pos` = 1;
 ```
 
-You will notice that the query does not terminate; it stays in `Running` state. That is because you created your first Streaming Query. As data come in, the result updates in real-time.
+> [!NOTE] You will notice that the query does not terminate; it stays in a `Running` state. That is because you created your first **Streaming Query**.
+>
+> As data comes in, the result updates in real-time. We will this in action next.
+
+> [!IMPORTANT] A running query incurs costs. If you don't need one, stop it.
 
 ## 2. Enhance the data with built-in ML functions and start the race
 
@@ -192,13 +202,15 @@ Next, we will create a `car_state` table that joins telemetry with race standing
 
 We will do that step-by-step.
 
-Start the race! We want to work with actual data.
+Start the race! This way we have a flow of data coming in.
 
 ```bash
 uv run f1-race
 ```
 
-If the race finishes but you are not done with the development of your statements, you can restart the race.
+> [!NOTE] Each lap takes about 20 seconds and there are 60 laps. After 20 minutes the race completes.
+
+Restart the race if/when needed:
 
 ```bash
 uv run reset
@@ -206,67 +218,108 @@ uv run reset
 
 ### 2.1 JOIN Streams
 
->[!NOTE] You can find a deep-dive session about [Streaming JOIN in Flink SQL](https://developer.confluent.io/courses/flink-sql/streaming-joins/) in Confluent's developer portal.
+In traditional SQL databases there's a whole family of join operations: inner and outer joins, left and right joins, and so on. Flink supports all of these classic SQL joins, but in most situations it's a mistake to use them in your Flink SQL applications. The reason has to do with what it means to execute a join in a streaming fashion (Streaming JOINs in Flink SQL).
 
-Let's start with a regular JOIN.
+Typically, two tables are related by having the primary key of one table present as a foreign key in another table (Streaming JOINs in Flink SQL). In our race data, each record in `race_standings` has a `car_number` column that is its primary key:
 
 ```SQL
+CREATE TABLE IF NOT EXISTS `race_standings` (
+  `car_number` INT,
+  -- ...
+  -- ... the rest of the fields
+  -- ...
+  `event_time` TIMESTAMP(3)
+  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '10' SECOND,
+  PRIMARY KEY (`car_number`) NOT ENFORCED -- 👈
+) DISTRIBUTED BY (`car_number`) INTO 1 BUCKETS
+WITH (
+  'changelog.mode' = 'upsert',
+);
+```
+
+The effect of setting up race_standings this way is that each new record in the standings stream replaces whatever was previously stored for that same car (Streaming JOINs in Flink SQL).
+
+Car telemetry, on the other hand, is modeled differently. Sensor readings are immutable, so the stream is insert-only rather than updating (and there's no primary key). And each reading has a foreign key relationship to the car it belongs to:
+
+```sql
+CREATE TABLE `car_telemetry` (
+  `car_number` INT,
+  -- ... more sensor columns
+  `event_time` TIMESTAMP(3),
+  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '5' SECOND
+) WITH ('changelog.mode' = 'append');
+```
+
+This makes it possible to join telemetry to standings, which you might do to enrich each reading with race context. This seems like a very natural thing to do:
+
+```sql
 SELECT
-  t.car_number, 
-  t.event_time, 
-  t.lap,
-  t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
-  t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
-  t.engine_temp_c, 
-  t.brake_temp_fl_c, t.brake_temp_fr_c, 
-  t.battery_charge_pct, 
-  t.fuel_remaining_kg,
-  r.`position`, 
-  r.gap_to_ahead_sec, r.gap_to_leader_sec, 
-  r.pit_stops, 
-  r.tire_compound, 
-  r.tire_age_laps
+ t.car_number, 
+ t.event_time, 
+ t.lap,
+ t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+ t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+ t.engine_temp_c, 
+ t.brake_temp_fl_c, t.brake_temp_fr_c, 
+ t.battery_charge_pct, 
+ t.fuel_remaining_kg,
+ r.`position`, 
+ r.gap_to_ahead_sec, r.gap_to_leader_sec, 
+ r.pit_stops, 
+ r.tire_compound, 
+ r.tire_age_laps
 FROM `car_telemetry` t
 JOIN `race_standings` r
-  ON t.car_number = r.car_number
-```
+ ON t.car_number = r.car_number
+ ```
 
-**Do not use a traditional inner join when doing stream enrichment!**
+The output looks right, but **DO NOT DO THIS!**
 
-> [Recommended module](https://developer.confluent.io/courses/flink-sql/streaming-joins/) from the Confluent developer learning path.
+A traditional inner join is not what you want to use for stream enrichment. A regular join produces an updating table, so a later standings update can change or remove results that were already emitted. It also keeps both inputs in state forever.
 
-A regular streaming join doesn’t perform an *“as of this event time”* lookup. A later standings update can change the join result for matching telemetry. A [temporal join](https://docs.confluent.io/cloud/current/flink/reference/queries/joins.html#temporal-joins) uses `t.event_time` as the lookup time and `race_standings.event_time` to determine when each standings version is valid.
+What you want instead is a temporal join:
 
-For each append-only telemetry row, the temporal join looks up the most recent `race_standings` version for that car as of `t.event_time`. Unlike a regular join, the result is insert-only: a later standings update won’t revise an already-enriched telemetry event.
-
-> A `temporal join` joins one table with another table that is updated over time. This join is made possible by linking both tables using a time attribute, which allows the join to consider the historical changes in the table. When viewing the table at a specific point in time, the join becomes a time-versioned join.
-
-In Confluent Cloud for Flink, `$rowtime` is a system column mapped to the Kafka record timestamp. You can instead use a column such as `event_time` for event-time operations, provided you declare it as a time attribute with a `WATERMARK` clause. (The platform-team has already done this, when they provisioned the resources.)
-
-> [!NOTE] [Watermarks](https://developer.confluent.io/courses/flink-sql/watermarks/) and the [hands-on session](https://developer.confluent.io/courses/flink-sql/watermarks-exercise/) are two deep-dive sessions into the watermarking strategy used in Apache Flink. This topic requires a separate session due to its complexity.
-
-```SQL
+```sql
 SELECT
-  t.car_number, 
-  t.event_time, 
-  t.lap,
-  t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
-  t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
-  t.engine_temp_c, 
-  t.brake_temp_fl_c, t.brake_temp_fr_c, 
-  t.battery_charge_pct, 
-  t.fuel_remaining_kg,
-  r.`position`, 
-  r.gap_to_ahead_sec, r.gap_to_leader_sec, 
-  r.pit_stops, 
-  r.tire_compound, 
-  r.tire_age_laps
+ t.car_number, 
+ t.event_time, 
+ t.lap,
+ t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+ t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+ t.engine_temp_c, 
+ t.brake_temp_fl_c, t.brake_temp_fr_c, 
+ t.battery_charge_pct, 
+ t.fuel_remaining_kg,
+ r.`position`, 
+ r.gap_to_ahead_sec, r.gap_to_leader_sec, 
+ r.pit_stops, 
+ r.tire_compound, 
+ r.tire_age_laps
 FROM `car_telemetry` t
 JOIN `race_standings` 
-  /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ 
-  FOR SYSTEM_TIME AS OF t.event_time AS r 
-  ON t.car_number = r.car_number
+ /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ 
+ FOR SYSTEM_TIME AS OF t.event_time AS r 
+ ON t.car_number = r.car_number
 ```
+
+This query relates each telemetry reading to the most recent race_standings record for that car, as of the time of that reading (`t.event_time`). This is almost always what you really want. Compared to a regular inner join, a temporal join has a number of other advantages:
+
+- The output stream is `insert-only` rather than updating, so you can apply any sort of further processing to it.
+- The output stream has watermarks, so you aren't restricted in how you can operate on it. For example, you can apply windowing to it.
+- The runtime doesn't have to store past telemetry readings.
+
+There are some restrictions, however:
+
+- The right-hand (versioned) table must be an updating table with a primary key. Here, `race_standings` is an upsert table keyed by car_number.
+- The primary key of the versioned table must be used in the equivalence condition of the temporal join. Here, that's `t.car_number = r.car_number`.
+
+In Confluent Cloud for Flink, `$rowtime` is a system column equal to the Kafka record timestamp (`$rowtime`). You can instead use a column such as `event_time` for event-time operations, provided you declare it as a time attribute with a `WATERMARK` clause. The platform team already did this for both tables when they provisioned the resources.
+
+The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-offset`, Flink reads race_standings from the earliest offset possible.
+
+> [!NOTE] Learn more about streaming JOINs in the [Flink SQL module](https://developer.confluent.io/courses/flink-sql/streaming-joins/) on Confluent Developer.
+
+> [!NOTE] [Watermarks](https://developer.confluent.io/courses/flink-sql/watermarks/) and the [hands-on session](https://developer.confluent.io/courses/flink-sql/watermarks-exercise/) are two deep-dive sessions into the watermarking strategy used in Apache Flink. This topic requires a separate session due to its complexity.
 
 ### 2.2 Window-Aggregations
 
@@ -274,7 +327,7 @@ Windows are central to processing infinite streams. Windows split the stream int
 
 Flink provides 4 built-in windowing functions: `TUMBLE`, `HOP`, `CUMULATE` and `SESSION`.
 
->[!NOTE]See examples for each function in our [public documentation](https://docs.confluent.io/cloud/current/flink/reference/queries/window-tvf.html#examples).
+> [!NOTE]See examples for each function in our [public documentation](https://docs.confluent.io/cloud/current/flink/reference/queries/window-tvf.html#examples).
 
 For the purpose of this demo, every lap takes exactly 20 seconds.
 
@@ -346,7 +399,7 @@ In this section we will use Machine Learning to spot anomalies in tire degradati
 
 Thankfully, we can use Flink's built-in ML models.
 
->[!NOTE]Confluent Cloud for Apache Flink comes with multiple built-in functions for ML and AI inference, as documented in our [public docs](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html).
+> [!NOTE]Confluent Cloud for Apache Flink comes with multiple built-in functions for ML and AI inference, as documented in our [public docs](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html).
 
 The [`ML_DETECT_ANOMALIES`](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html#ml-detect-anomalies) function uses an ARIMA model to identify outliers in our time-series data.
 
@@ -407,7 +460,7 @@ Here, `window_time` is the time attribute produced by the tumbling-window query.
 
 So, as each new 20-second window arrives, the calculation considers that car’s ordered history up to that point.
 
->[!NOTE]You can read more about OVER aggregations in the [corresponding module](https://developer.confluent.io/courses/flink-sql/over-windows/) of our Confluent developer Flink course.
+> [!NOTE]You can read more about OVER aggregations in the [corresponding module](https://developer.confluent.io/courses/flink-sql/over-windows/) of our Confluent developer Flink course.
 
 The output of the `ML_DETECT_ANOMALIES` function is documented in our [public docs](https://docs.confluent.io/cloud/current/ai/builtin-functions/detect-anomalies.html#anomaly-detection-results).
 
