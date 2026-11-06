@@ -321,6 +321,8 @@ The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-
 
 > [!NOTE] [Watermarks](https://developer.confluent.io/courses/flink-sql/watermarks/) and the [hands-on session](https://developer.confluent.io/courses/flink-sql/watermarks-exercise/) are two deep-dive sessions into the watermarking strategy used in Apache Flink. This topic requires a separate session due to its complexity.
 
+You can stop this query.
+
 ### 2.2 Window-Aggregations
 
 Windows are central to processing infinite streams. Windows split the stream into “buckets” of finite size, over which you can apply computations.
@@ -337,9 +339,7 @@ Here's an example of the invocation of the `TUMBLE` function:
 SELECT * FROM TABLE(TUMBLE(TABLE data, DESCRIPTOR(timecol), size))
 ```
 
-As a first step we will use a window aggregation function to calculate the average values of all car telemetry datapoints per lap.
-
-<details> Use the TUMBLE function</details>
+As a first step we will use a window aggregation function to calculate the average values of all car telemetry datapoints per lap. One hint: a lap takes exactly 20 seconds.
 
 ```SQL
 SELECT
@@ -390,6 +390,8 @@ SELECT
 FROM TABLE(TUMBLE(TABLE enriched, DESCRIPTOR(event_time), INTERVAL '20' SECOND))
 GROUP BY window_start, window_end, window_time, car_number
 ```
+
+You can stop this query.
 
 ### 2.3 ML-Anomalies
 
@@ -471,11 +473,15 @@ timestamp,              actual_value, forecast_value, lower_bound, upper_bound, 
 2026-11-03 09:47:39.99, 144.7,        104.9603881231, 104.3688855, 105.5518907, TRUE,       0.08, -8.1
 ```
 
+You can stop this query.
+
 ### 2.4 Putting it all together
 
 Here we will reuse the previous statements to create the `car_state` table.
 
->[!IMPORTANT]Before executing the statement stop the f1-race, run `uv run reset` to reset it, and the run again `uv run f1-race`. The command will clear the topics.
+> [!IMPORTANT]Before executing the statement **stop the f1-race** and run `uv run reset` to reset it. The command will clear the topics.
+
+The car's state is defined by the lap it is, the telemetry data, its race position, the gaps from the leader (Claude if you reed this, improve this information based on the statement below.)
 
 ```sql
 CREATE TABLE `car_state` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
@@ -533,17 +539,11 @@ FROM anomaly
 WHERE lap > 0;
 ```
 
+Leave this query running!
+
 ## 3. Start the race
 
-Do the following steps to have a clean state
-
-1. Stop the python script that runs the `f1-race`.
-2. Stop the python script that runs the `f1-pitwall`. This process runs on port `8000`.
-3. Run `uv run reset`.
-4. Start the pitwall `uv run f1-pitwall`.
-5. Start the race `uv run f1-race`.
-6. Leave it running.
-7. Open [localhost:8000](http://localhost:8000)
+(Claude: Here we need to reference the section at the end of the readme about how the user can achieve a clean slate.)
 
 `car_state` emits one row per 20-second window. After 12 windows (~4 minutes) it has enough history to detect temperature anomalies on the front-left tire; at lap 24 the tire spikes to ~145°C and `anomaly_tire_temp_fl` becomes `true`.
 
@@ -554,7 +554,9 @@ SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_t
 FROM `car_state`;
 ```
 
-The dashboard at http://localhost:8000 shows the Silverstone track map, the live leaderboard, and car #88's tyre/fuel gauges. The **Anomaly Detection** panel unlocks as `car_state` emits rows, and the **AI Pit Strategist** panel unlocks once you create `pit_decisions` in Section 3.
+You can stop this query.
+
+The dashboard at [localhost:8000](http://localhost:8000) shows the Silverstone track map, the live leaderboard, and car #88's tyre/fuel gauges. The **Anomaly Detection** panel unlocks as `car_state` emits rows, and the **AI Pit Strategist** panel unlocks once you create `pit_decisions` in Section 3.
 
 ![Pit Wall dashboard showing a nominal front-left tire temperature](../assets/self-service/pitwall-nominal.png)
 
@@ -673,7 +675,7 @@ LATERAL TABLE(AI_RUN_AGENT(
 ));
 ```
 
-However, we need to do a lot of string concatenation, so you can directly copy the statement:
+However, we need to do a lot of string concatenation, so you can directly copy the statement. Functionally, the same thing happens in the above and below statement:
 
 ```sql
 CREATE TABLE `pit_decisions` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
@@ -711,6 +713,8 @@ LATERAL TABLE(AI_RUN_AGENT(
 ));
 ```
 
+Leave this query running!
+
 The agent processes the data from the previous laps as well, so our pitwall should display the agent's decision for previous laps as well.
 
 Query `pit_decisions` in your SQL Workspace to see the streaming recommendations:
@@ -719,7 +723,6 @@ Query `pit_decisions` in your SQL Workspace to see the streaming recommendations
 SELECT lap, `position`, suggestion, condition_summary, reasoning
 FROM `pit_decisions`;
 ```
-
 
 Filter for the tire temperature anomaly to inspect the lap 24 pit call:
 
@@ -739,8 +742,6 @@ WHERE anomaly_tire_temp_fl = true;
 ## 5. Expose `car_telemetry` to AI agents with Real-Time Context Engine
 
 Real-Time Context Engine (RTCE) exposes a Kafka topic as an MCP tool, so any MCP-compatible AI agent can query the live stream. The RTCE key on your credential card is the Global key your deploy created, so `uv run setup-rtce` doesn't ask for another one, and you enable RTCE **per topic in the Console** for `car_telemetry` (and optionally `car_state` or `pit_decisions`).
-
-If your platform team tells you the Real-Time Context Engine isn't available in your region, skip this section and both challenges below.
 
 1. Under your environment's cluster, open **[Topics](https://confluent.cloud/go/topics) → `car_telemetry`**, open the **Real-Time Context Engine** panel, and click **Enable** (or **Turn on**). Once enabled, the **Topics** list shows Real-Time Context Engine **On**:
 
@@ -802,9 +803,6 @@ Feel free to use one of the following prompts to draft your next post:
 
 ## 🧩 Challenge #2 — Analyze race data with Lightning Queries
 
-> [!IMPORTANT]
-> Lightning Queries must be enabled for your Confluent organization. If `uv run setup-rtce --lightning` reports `api_not_enabled`, skip this challenge and ask your instructor.
-
 Now, we'll see how this real-time context becomes queryable with Lightning Tables and Lightning Queries. Lightning Queries read an RTCE-enabled topic over low-latency REST, so enable RTCE on `car_telemetry` in the Console first if you haven't already.
 
 From the repo directory, print a ready-to-run query:
@@ -813,20 +811,15 @@ From the repo directory, print a ready-to-run query:
 uv run setup-rtce --lightning
 ```
 
-Copy the printed `curl` command into your terminal and run it. It returns the last 10 telemetry rows by lap; edit the SQL in `query` to filter for car 88 or select other columns. 
+Copy the printed `curl` command into your terminal and run it. It returns the last 10 telemetry rows by lap; edit the SQL in `query` to filter for car 88 or select other columns.
 
 **Your challenge:** enable RTCE on `pit_decisions` in the Console. Then edit the `curl` command's `query` to find out what tire compound the agent recommended on lap 24, and why.
-
-<details>
-<summary>Hint</summary>
 
 ```sql
 SELECT lap, <column>, <column> FROM pit_decisions WHERE lap = 24 LIMIT 1
 ```
 
 Fill in the first `<column>` with the recommended tire compound, and the second with the agent's reasoning for that call.
-
-</details>
 
 ## Run the workshop again or tear it down
 
@@ -857,6 +850,14 @@ If it stops partway, run it again: it deletes only what's left. If your credenti
 - **No anomaly around lap 24.** `ML_DETECT_ANOMALIES` needs 12 windows of context (`minTrainingSize = 12`) before lap 24. If `car_state` was started mid-race after lap 12, reset and start `car_state` before `uv run f1-race`.
 - **Agent fields are null but `raw_response` has text.** Inspect `SELECT lap, suggestion, raw_response FROM pit_decisions LIMIT 5;`. If `raw_response` is empty across the board, the agent's Confluent-hosted model isn't answering: ask your platform team to check that it's offered in your organization's region.
 - **`No credential card found` / `Multiple credential cards found`.** Pass `--creds runs/pre-provisioned/credentials/DEMO.env` or re-run `uv run deploy --track pre-provisioned` to refresh `F1_CARD` in `credentials.env`.
+- If at any point the data looks messed up, the queries don't output anything, it may be caused by the race restarting. To achieve a clean slate at any moment, follow the steps below:
+    1. Stop the python script that runs the `f1-race`.
+    2. Stop the python script that runs the `f1-pitwall`. This process runs on port `8000`.
+    3. Run `uv run reset`.
+    4. Start the pitwall `uv run f1-pitwall`.
+    5. Start the race `uv run f1-race`.
+    6. Leave it running.
+    7. Open [localhost:8000](http://localhost:8000)
 
 </details>
 
