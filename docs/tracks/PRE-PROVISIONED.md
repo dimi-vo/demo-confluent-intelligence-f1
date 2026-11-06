@@ -1,24 +1,38 @@
 # Pre-provisioned workshop walkthrough
 
+**Interactive guide:** open [`docs/site/pre-provisioned.html`](../site/pre-provisioned.html) in your browser for a step-by-step version of this walkthrough that tracks your progress.
+
 ![F1 Pit Wall Confluent Intelligence architecture](../assets/architecture.png)
 
 > [!NOTE]
 >
-> Use this path when your organization's platform team has created a Confluent Cloud environment for you, made you its EnvironmentAdmin, and built the workshop inside it. You sign in with your own work account, connect to that environment as yourself (`uv run deploy --track pre-provisioned`), and run the race simulator on your machine.
+> Use this path when your organization's platform team has created a Confluent Cloud environment for you, made you its EnvironmentAdmin, and built the workshop inside it. You sign in with your own work account, connect to that environment as yourself, and run the race simulator on your machine.
 
 **On the platform team?** The required infrastructure and resources are created with the [Terraform module](../../platform-team/README.md) in `platform-team/`.
 
-## 0. Setup – Do these steps before the workshop
+**How to use this walkthrough.** Each step starts with what you'll learn and your task. Try the task yourself first: open **💡 Hint** if you're stuck, and **✅ Solution** to check your answer or copy the statement. **Learn more** links to the Confluent documentation, and **🛠️ Troubleshooting** covers what can go wrong in that step.
 
-### 0.1 One week before the workshop
+## 0. Setup
+
+Do 0.1 and 0.2 before the workshop day, and 0.3 and 0.4 at the start of the workshop.
+
+### 0.1 Sign in to Confluent Cloud
+
+**When:** one week before the workshop.
 
 Sign in to the [Confluent Cloud Console](https://confluent.cloud) with your work email. With SSO, the Console sends you to your organization's sign-in page.
 
-> This is required for your user account to be registered under your company's organization and for your team to provision the infrastructure for you.
+> [!IMPORTANT]
+>
+> This first sign-in registers your user account in your company's organization, so your platform team can provision the infrastructure for you.
 
-### 0.2 A couple days before the workshop
+### 0.2 Install the tools and clone the repository
 
-Mac
+**When:** a couple of days before the workshop.
+
+You need three tools: Git, uv and the Confluent CLI.
+
+**macOS**
 
 ```bash
 brew install git uv
@@ -26,7 +40,7 @@ brew install --cask confluent-cli
 ```
 
 <details>
-<summary>Windows </summary>
+<summary>Windows</summary>
 
 ```powershell
 winget install --id Git.Git -e
@@ -37,125 +51,157 @@ The Confluent CLI has no reliable winget package. Download the latest `confluent
 
 </details>
 
+Clone the workshop repository, and move into it:
+
 ```bash
 git clone https://github.com/confluentinc/demo-confluent-intelligence-f1.git
+cd demo-confluent-intelligence-f1
 ```
 
-### 0.3 On the day of the workshop
+Run every `uv run` command in this walkthrough from this folder.
 
-1. Explore your Confluent Cloud environment:
+### 0.3 Explore your environment from the CLI
+
+**When:** on the day of the workshop.
+
+**What you'll learn:** how your environment, Kafka cluster and topics look from the Confluent CLI, and the difference between control-plane and data-plane operations.
+
+1. Sign in to the Confluent CLI:
 
     ```bash
     confluent login
     ```
 
-    Enter your work email.
+    Enter your work email. With SSO, it opens your organization's sign-in page in your browser. The deploy in 0.4 uses this session to create your Global API key as you.
 
-    With SSO, it opens your organization's sign-in page in your browser. The deploy uses this session to create your Global API key as you.
-
-    Explore your environment
+2. List your environments:
 
     ```bash
     confluent environment list
     ```
 
-    If you see multiple environments listed here, select the one provided to you for the workshop:
+    If you see several environments, select the one provided to you for the workshop, using its ID:
 
     ```bash
     confluent environment use env-abcd123
     ```
 
-    See the provisioned kafka clusters.
+3. List the provisioned Kafka clusters:
 
     ```bash
     confluent kafka cluster list
     ```
 
-    There should be just one in your environment. Set it as the default.
+    There should be just one in your environment. Set it as the default, using its ID:
 
     ```bash
     confluent kafka cluster use lkc-abcd123
     ```
 
-    See the provisioned topics.
+4. List the provisioned topics:
 
     ```bash
     confluent kafka topic list
     ```
 
-    > [!NOTE] The above operations are **Control Plane** operations; i.e. describing topics, clusters, or environments. If you try to consume data from a topic, e.g. `confluent kafka topic consume my-topic` you will see `Error: no API key selected for resource "lkc-abcd123"`. Consuming data is a **Data Plane** operation. For such operations you need to authenticate against the Kafka cluster. We will create the required API keys in the next section.
+> [!NOTE]
+>
+> These are **control-plane** operations: they describe topics, clusters or environments. If you try to consume data from a topic, for example with `confluent kafka topic consume car_telemetry`, you'll see `Error: no API key selected for resource "lkc-abcd123"`. Consuming data is a **data-plane** operation, and it needs you to authenticate against the Kafka cluster. You create the API keys for that in the next step.
 
-2. Mint the keys:
+**Learn more**
 
-    ```bash
-    uv run deploy --track pre-provisioned
-    ```
+- [Get Started with Confluent CLI](https://docs.confluent.io/confluent-cli/current/overview.html)
+- [`confluent login`](https://docs.confluent.io/confluent-cli/current/command-reference/confluent_login.html)
 
-    It creates three API keys for your account:
+### 0.4 Create your API keys
 
-    1. A Global API Key
-    2. A Kafka API Key
-    3. A Schema Registry API Key
+**When:** on the day of the workshop.
 
-    It writes them to your credential card, `runs/pre-provisioned/credentials/DEMO.env`.
+**What you'll learn:** which API keys the workshop tools need, and what each one is for.
 
-    > Your Global key acts with all of your permissions, so keep the card private.
+Run the deploy:
 
-    New keys may take a minute or two to become active, so expect a couple of short waits. Before the script finishes, it checks that `driver_race_history` holds its 198 rows.
+```bash
+uv run deploy --track pre-provisioned
+```
 
-    When the script finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. Running it again reuses your credential card while its keys still work, so it creates nothing new.
+It creates three API keys for your account:
 
-    <details>
-    <summary>Troubleshooting</summary>
+1. A **Global API key**. The deploy uses it to create the other two keys, and the workshop tools use it for Flink and the Real-Time Context Engine.
+2. A **Kafka API key**, which lets the race simulator and the Pit Wall dashboard read and write your topics.
+3. A **Schema Registry API key**, which lets them read and register your topics' Avro schemas.
 
-    - **`Error: Not logged into Confluent Cloud.`** Your Confluent CLI session is missing or has expired. Run `confluent login`, then the deploy again.
-    - **`Confluent Cloud refused a new Global key`.** Each account can hold 2 Global keys. Delete one you no longer use in the Console under **API keys** → **My account**, then run the deploy again.
-    - **`Your Global key sees no environment you're directly bound to.`** Ask your platform team for a direct EnvironmentAdmin role binding on your user. A binding through an SSO group mapping isn't enough, because API keys don't carry group-mapped permissions. If you belong to several Confluent Cloud organizations, the deploy lists them: run `confluent login --organization <id>` for the right one, then the deploy again.
-    - **`Your platform team hasn't provisioned <name> (<id>) yet`.** Send them the environment ID it names, and run the deploy again once they're done.
-    - **`driver_race_history holds N rows, expected 198`.** Ask your platform team to rebuild the table (their guide shows how), then run the deploy again.
-    - **A wait that times out, or `could not reach the Confluent Cloud API`.** Run the deploy again. A run that stops before writing your card deletes the keys it created, so retrying never uses up your Global-key slots.
+It writes them to your credential card, `runs/pre-provisioned/credentials/DEMO.env`.
 
-    </details>
+New keys can take a minute or two to become active, so expect a couple of short waits. Before it finishes, the deploy checks that `driver_race_history` holds its 198 rows.
+
+When it finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. It then offers to start the Pit Wall dashboard in the background. You won't need the dashboard until section 3, so you can answer **n**.
+
+Running the deploy again reuses your credential card while its keys still work, so it creates nothing new.
+
+> [!WARNING]
+>
+> Your Global key acts with all of your permissions, so keep the card private.
+
+**Learn more**
+
+- [Use API Keys to Authenticate to Confluent Cloud](https://docs.confluent.io/cloud/current/security/authenticate/workload-identities/service-accounts/api-keys/overview.html)
+
+<details>
+<summary>🛠️ Troubleshooting</summary>
+
+- **`Error: Not logged into Confluent Cloud.`** Your Confluent CLI session is missing or has expired. Run `confluent login`, then the deploy again.
+- **`Confluent Cloud refused a new Global key`.** Each account can hold 2 Global keys. Delete one you no longer use in the Console under **API keys** → **My account**, then run the deploy again.
+- **`Your Global key sees no environment you're directly bound to.`** Ask your platform team for a direct EnvironmentAdmin role binding on your user. A binding through an SSO group mapping isn't enough, because API keys don't carry group-mapped permissions. If you belong to several Confluent Cloud organizations, the deploy lists them: run `confluent login --organization <id>` for the right one, then the deploy again.
+- **`Your platform team hasn't provisioned <name> (<id>) yet`.** Send them the environment ID it names, and run the deploy again once they're done.
+- **`driver_race_history holds N rows, expected 198`.** Ask your platform team to rebuild the table (their guide shows how), then run the deploy again.
+- **A wait that times out, or `could not reach the Confluent Cloud API`.** Run the deploy again. A run that stops before writing your card deletes the keys it created, so retrying never uses up your Global-key slots.
+
+</details>
 
 ## 1. Get familiar with Flink
 
-Go the [Confluent Cloud Console](https://confluent.cloud).
+Get to know the Flink SQL workspace, and explore the tables and models your platform team prepared for you.
 
-### 1.1 The Flink SQL Workspace
+### 1.1 The Flink SQL workspace
 
-A Flink SQL workspace is the browser-based SQL editor in the Confluent Cloud console.
+**What you'll learn:** what a Flink SQL workspace and a compute pool are, and how Kafka resources map to Flink catalogs, databases and tables.
 
-1. Open the [SQL workspace](https://confluent.cloud/workspaces/) page or use the navigation on the left side.
+A Flink SQL workspace is the browser-based SQL editor in the Confluent Cloud Console.
 
-    Click on `Create new workspace`.
+1. Go to the [Confluent Cloud Console](https://confluent.cloud) and open the [SQL workspaces](https://confluent.cloud/workspaces/) page, or use the navigation on the left side.
+
+2. Click **Create new workspace**.
 
     <button style="background-color: #1668dc; color: white; border: 0; border-radius: 6px; padding: 10px 16px; font-size: 14px;"><span>Create new workspace</span></button>
 
-    A workspace does not incur any costs and it does not run any Flink jobs.
+    A workspace by itself doesn't incur any costs or run any Flink jobs. Flink jobs run on a compute pool, which represents the resources used to run them. Your platform team has provisioned the compute pool for you.
 
-    A compute pool represents the resources that are used to run Flink jobs. The compute pool has been provisioned for you by the platform team.
+3. To simplify the statements later, select the default catalog and database for your workspace with the **Use catalog** and **Use database** dropdowns. Pick the ones the deploy printed: your environment (for example `John-Doe-c21e_env`) and `RIVER-RACING-DEMO-CLUSTER`.
 
-2. Configure the workspace
+    ![The Use catalog and Use database dropdowns at the top of a SQL workspace](image2.png)
 
-    To simplify the statements later select the default `catalog` and `database` for your workspace.
+Kafka resources are available in Flink by default. The mapping between Kafka and Flink resources is:
 
-    Click on the `Use catalog` and `Use database` dropdowns.
+| Kafka           | Flink     |
+|-----------------|-----------|
+| Environment     | Catalog   |
+| Cluster         | Database  |
+| Topic + Schema  | Table     |
 
-    ![alt text](image2.png)
+**Learn more**
 
-    Kafka resources are available in Flink by default. The mapping between the Kafka and Flink resources is:
-
-    | Kafka           | Flink     |
-    |-----------------|-----------|
-    | Environment     | Catalog   |
-    | Cluster         | Database  |
-    | Topic + Schema  | Table     |
+- [Flink SQL Quick Start with Confluent Cloud Console](https://docs.confluent.io/cloud/current/flink/get-started/quick-start-cloud-console.html#step-1-create-a-workspace)
+- [Compute Pools](https://docs.confluent.io/cloud/current/flink/concepts/compute-pools.html)
+- [Metadata mapping between Kafka and Flink](https://docs.confluent.io/cloud/current/flink/overview.html#metadata-mapping-between-ak-cluster-topics-schemas-and-af)
 
 ### 1.2 Data exploration
 
-Explore the pre-deployed source tables.
+**What you'll learn:** how to inspect tables and models with `SHOW` and `DESCRIBE`, and what makes a query a streaming query.
 
-```SQL
+Explore the pre-deployed source tables:
+
+```sql
 SHOW TABLES;
 ```
 
@@ -165,81 +211,107 @@ SHOW TABLES;
 | `race_standings`      | Race simulator — all 22 cars, keyed by `car_number` (upsert)  | Avro    |
 | `driver_race_history` | 198 historical race rows seeded by your platform team         | Avro    |
 
-```SQL
+Look at the columns of `driver_race_history`:
+
+```sql
 DESCRIBE `driver_race_history`;
 ```
 
-Make sure that the driver_race_history topic is populated. It should have 198 rows.
+Make sure that `driver_race_history` is populated. It should have 198 rows:
 
 ```sql
 SELECT COUNT(*) FROM driver_race_history;
 ```
 
-Explore the pre-deployed models
+Explore the pre-deployed models:
 
 ```sql
 SHOW MODELS;
 ```
 
-List the grand prix winners
+**Your task:** list the Grand Prix winners: the driver and the Grand Prix name of every row whose `finishing_pos` is 1.
 
-```SQL
+<details>
+<summary>✅ Solution</summary>
+
+```sql
 select driver, `gp_name` from `driver_race_history`
 where `finishing_pos` = 1;
 ```
 
-> [!NOTE] You will notice that the query does not terminate; it stays in a `Running` state. That is because you created your first **Streaming Query**.
+</details>
+
+You'll notice that the query doesn't terminate: it stays in a **Running** state. That's because you created your first **streaming query**. As data comes in, the result updates in real time. You'll see this in action in the next section.
+
+Stop the query when you're done.
+
+> [!IMPORTANT]
 >
-> As data comes in, the result updates in real-time. We will this in action next.
+> A running query incurs costs. If you don't need one, stop it.
 
-> [!IMPORTANT] A running query incurs costs. If you don't need one, stop it.
+**Learn more**
 
-## 2. Enhance the data with built-in ML functions and start the race
+- [SHOW Statements](https://docs.confluent.io/cloud/current/flink/reference/statements/show.html)
+- [DESCRIBE Statement](https://docs.confluent.io/cloud/current/flink/reference/statements/describe.html)
+- [Flink SQL Statements](https://docs.confluent.io/cloud/current/flink/concepts/statements.html)
+- [Confluent Cloud for Apache Flink Billing](https://docs.confluent.io/cloud/current/flink/concepts/flink-billing.html)
 
-Your platform team set up source tables for `car_telemetry`, live `race_standings`, and the `driver_race_history`.
+## 2. Enrich the data with built-in ML functions
 
-Next, we will create a `car_state` table that joins telemetry with race standings over 20-second tumbling windows and uses Confluent's built-in `ML_DETECT_ANOMALIES` function to flag abnormal front-left tire temperatures.
+Your platform team set up the source tables `car_telemetry`, `race_standings` and `driver_race_history`.
 
-We will do that step-by-step.
+In this section, you create a `car_state` table that joins telemetry with race standings over 20-second tumbling windows, and uses Confluent's built-in `ML_DETECT_ANOMALIES` function to flag abnormal front-left tire temperatures. You build it step by step: a join (2.2), a window aggregation (2.3), anomaly detection (2.4), and finally the table itself (2.5).
 
-Start the race! This way we have a flow of data coming in.
+### 2.1 Start the race
+
+Start the race simulator, so there's a flow of data coming in:
 
 ```bash
 uv run f1-race
 ```
 
-> [!NOTE] Each lap takes about 20 seconds and there are 60 laps. After 20 minutes the race completes.
+Leave it running.
 
-Restart the race if/when needed:
+> [!NOTE]
+>
+> Each lap takes 20 seconds and there are 60 laps, so the race completes after 20 minutes. Lap 1 starts on the next 20-second wall-clock boundary, so it can take up to 20 seconds to appear.
 
-```bash
-uv run reset
-```
+To restart the race, follow [Start from a clean slate](#start-from-a-clean-slate).
 
-### 2.1 JOIN Streams
+<details>
+<summary>🛠️ Troubleshooting</summary>
 
-In traditional SQL databases there's a whole family of join operations: inner and outer joins, left and right joins, and so on. Flink supports all of these classic SQL joins, but in most situations it's a mistake to use them in your Flink SQL applications. The reason has to do with what it means to execute a join in a streaming fashion (Streaming JOINs in Flink SQL).
+- **`No credential card found` / `Multiple credential cards found`.** Pass `--creds runs/pre-provisioned/credentials/DEMO.env` or re-run `uv run deploy --track pre-provisioned` to refresh `F1_CARD` in `credentials.env`.
 
-Typically, two tables are related by having the primary key of one table present as a foreign key in another table (Streaming JOINs in Flink SQL). In our race data, each record in `race_standings` has a `car_number` column that is its primary key:
+</details>
 
-```SQL
+### 2.2 Join streams
+
+**What you'll learn:** why a regular join is the wrong tool for enriching a stream, and how a temporal join relates each telemetry reading to the race standings that were valid at that moment.
+
+In traditional SQL databases there's a whole family of join operations: inner and outer joins, left and right joins, and so on. Flink supports all of these classic SQL joins, but in most situations it's a mistake to use them in your Flink SQL applications. The reason has to do with what it means to execute a join in a streaming fashion.
+
+Typically, two tables are related by having the primary key of one table present as a foreign key in another table. In our race data, each record in `race_standings` has a `car_number` column that is its primary key:
+
+```sql
 CREATE TABLE IF NOT EXISTS `race_standings` (
   `car_number` INT,
   -- ...
   -- ... the rest of the fields
   -- ...
-  `event_time` TIMESTAMP(3)
+  `event_time` TIMESTAMP(3),
   WATERMARK FOR `event_time` AS `event_time` - INTERVAL '10' SECOND,
   PRIMARY KEY (`car_number`) NOT ENFORCED -- 👈
 ) DISTRIBUTED BY (`car_number`) INTO 1 BUCKETS
 WITH (
-  'changelog.mode' = 'upsert',
+  'changelog.mode' = 'upsert'
+  -- ... the rest of the options
 );
 ```
 
-The effect of setting up race_standings this way is that each new record in the standings stream replaces whatever was previously stored for that same car (Streaming JOINs in Flink SQL).
+The effect of setting up `race_standings` this way is that each new record in the standings stream replaces whatever was previously stored for that same car.
 
-Car telemetry, on the other hand, is modeled differently. Sensor readings are immutable, so the stream is insert-only rather than updating (and there's no primary key). And each reading has a foreign key relationship to the car it belongs to:
+Car telemetry, on the other hand, is modeled differently. Sensor readings are immutable, so the stream is insert-only rather than updating, and there's no primary key. Each reading has a foreign-key relationship to the car it belongs to:
 
 ```sql
 CREATE TABLE `car_telemetry` (
@@ -250,7 +322,7 @@ CREATE TABLE `car_telemetry` (
 ) WITH ('changelog.mode' = 'append');
 ```
 
-This makes it possible to join telemetry to standings, which you might do to enrich each reading with race context. This seems like a very natural thing to do:
+This makes it possible to join telemetry to standings, which you might do to enrich each reading with race context. A regular join seems like a very natural way to do it:
 
 ```sql
 SELECT
@@ -271,13 +343,26 @@ SELECT
 FROM `car_telemetry` t
 JOIN `race_standings` r
  ON t.car_number = r.car_number
- ```
+```
 
-The output looks right, but **DO NOT DO THIS!**
+The output looks right, but **don't do this!** Stop the query.
 
-A traditional inner join is not what you want to use for stream enrichment. A regular join produces an updating table, so a later standings update can change or remove results that were already emitted. It also keeps both inputs in state forever.
+> [!WARNING]
+>
+> A regular inner join is not what you want for stream enrichment. It produces an updating table, so a later standings update can change or remove results that were already emitted. It also keeps both inputs in state forever.
 
-What you want instead is a temporal join:
+**Your task:** rewrite the query as a *temporal join*, which enriches each telemetry reading with the standings of its car as of the reading's `event_time`.
+
+<details>
+<summary>💡 Hint</summary>
+
+- A temporal join adds `FOR SYSTEM_TIME AS OF <time attribute>` after the versioned table, here `race_standings`. The time attribute is the telemetry reading's `t.event_time`.
+- To make sure the query also sees standings written before it started, read `race_standings` from the earliest offset with an `OPTIONS` hint: `/*+ OPTIONS('scan.startup.mode'='earliest-offset') */`.
+
+</details>
+
+<details>
+<summary>✅ Solution</summary>
 
 ```sql
 SELECT
@@ -302,46 +387,71 @@ JOIN `race_standings`
  ON t.car_number = r.car_number
 ```
 
-This query relates each telemetry reading to the most recent race_standings record for that car, as of the time of that reading (`t.event_time`). This is almost always what you really want. Compared to a regular inner join, a temporal join has a number of other advantages:
+This query relates each telemetry reading to the most recent `race_standings` record for that car, as of the time of that reading (`t.event_time`). This is almost always what you really want. Compared to a regular inner join, a temporal join has a number of other advantages:
 
-- The output stream is `insert-only` rather than updating, so you can apply any sort of further processing to it.
+- The output stream is insert-only rather than updating, so you can apply any sort of further processing to it.
 - The output stream has watermarks, so you aren't restricted in how you can operate on it. For example, you can apply windowing to it.
 - The runtime doesn't have to store past telemetry readings.
 
 There are some restrictions, however:
 
-- The right-hand (versioned) table must be an updating table with a primary key. Here, `race_standings` is an upsert table keyed by car_number.
+- The right-hand (versioned) table must be an updating table with a primary key. Here, `race_standings` is an upsert table keyed by `car_number`.
 - The primary key of the versioned table must be used in the equivalence condition of the temporal join. Here, that's `t.car_number = r.car_number`.
 
-In Confluent Cloud for Flink, `$rowtime` is a system column equal to the Kafka record timestamp (`$rowtime`). You can instead use a column such as `event_time` for event-time operations, provided you declare it as a time attribute with a `WATERMARK` clause. The platform team already did this for both tables when they provisioned the resources.
+In Confluent Cloud for Apache Flink, `$rowtime` is a system column equal to the Kafka record timestamp. You can instead use a column such as `event_time` for event-time operations, provided you declare it as a time attribute with a `WATERMARK` clause. The platform team already did this for both tables when they provisioned the resources.
 
-The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-offset`, Flink reads race_standings from the earliest offset possible.
+The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-offset`, Flink reads `race_standings` from the earliest available offset.
 
-> [!NOTE] Learn more about streaming JOINs in the [Flink SQL module](https://developer.confluent.io/courses/flink-sql/streaming-joins/) on Confluent Developer.
+</details>
 
-> [!NOTE] [Watermarks](https://developer.confluent.io/courses/flink-sql/watermarks/) and the [hands-on session](https://developer.confluent.io/courses/flink-sql/watermarks-exercise/) are two deep-dive sessions into the watermarking strategy used in Apache Flink. This topic requires a separate session due to its complexity.
+Stop the query when you're done.
 
-You can stop this query.
+> [!NOTE]
+>
+> Watermarks are complex enough to need a session of their own, so this workshop doesn't go deeper into them. The two Confluent Developer modules under **Learn more** cover the watermarking strategy used in Apache Flink.
 
-### 2.2 Window-Aggregations
+**Learn more**
 
-Windows are central to processing infinite streams. Windows split the stream into “buckets” of finite size, over which you can apply computations.
+- [Streaming JOINs in Flink SQL](https://developer.confluent.io/courses/flink-sql/streaming-joins/)
+- [Event-time temporal joins](https://docs.confluent.io/cloud/current/flink/reference/queries/joins.html#event-time-temporal-joins)
+- [Time and Watermarks](https://docs.confluent.io/cloud/current/flink/concepts/timely-stream-processing.html)
+- [How streaming SQL uses watermarks](https://developer.confluent.io/courses/flink-sql/watermarks/) and [Exercise: Hands-on with watermarks](https://developer.confluent.io/courses/flink-sql/watermarks-exercise/)
+- [The `$rowtime` system column](https://docs.confluent.io/cloud/current/flink/reference/statements/create-table.html#rowtime)
+- [SQL Hints](https://docs.confluent.io/cloud/current/flink/reference/queries/hints.html)
 
-Flink provides 4 built-in windowing functions: `TUMBLE`, `HOP`, `CUMULATE` and `SESSION`.
+### 2.3 Window aggregations
 
-> [!NOTE]See examples for each function in our [public documentation](https://docs.confluent.io/cloud/current/flink/reference/queries/window-tvf.html#examples).
+**What you'll learn:** how windowing functions split an infinite stream into finite windows, and how to aggregate each window.
 
-For the purpose of this demo, every lap takes exactly 20 seconds.
+Windows are central to processing infinite streams. Windows split the stream into "buckets" of finite size, over which you can apply computations.
 
-Here's an example of the invocation of the `TUMBLE` function:
+Flink provides 4 built-in windowing functions: `TUMBLE`, `HOP`, `CUMULATE` and `SESSION`. Here's an example of the invocation of the `TUMBLE` function:
 
-```SQL
+```sql
 SELECT * FROM TABLE(TUMBLE(TABLE data, DESCRIPTOR(timecol), size))
 ```
 
-As a first step we will use a window aggregation function to calculate the average values of all car telemetry datapoints per lap. One hint: a lap takes exactly 20 seconds.
+For the purpose of this demo, every lap takes exactly 20 seconds.
 
-```SQL
+**Your task:**
+
+1. Use a window aggregation to calculate the average of every `car_telemetry` data point per lap.
+2. Extend the query to include our driver's position in the race, which is paramount to developing our racing strategy. Use the result of the temporal join from 2.2 in this statement.
+
+<details>
+<summary>💡 Hint</summary>
+
+- A lap takes exactly 20 seconds, so a 20-second tumbling window holds one lap: `TUMBLE(TABLE car_telemetry, DESCRIPTOR(event_time), INTERVAL '20' SECOND)`.
+- Group by the window columns (`window_start`, `window_end`, `window_time`) and `car_number`.
+- For part 2, join first, then window: wrap the temporal join in a CTE (`WITH enriched AS (...)`) and pass `TABLE enriched` to `TUMBLE`.
+- Average the telemetry columns, and use `MAX()` for the race-standings columns (position, gaps, pit stops, tire compound and tire age).
+
+</details>
+
+<details>
+<summary>✅ Solution: averages per lap</summary>
+
+```sql
 SELECT
   window_start, window_end, window_time, car_number, MAX(lap) AS lap,
   AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
@@ -354,10 +464,12 @@ FROM TABLE(TUMBLE(TABLE car_telemetry, DESCRIPTOR(event_time), INTERVAL '20' SEC
 GROUP BY window_start, window_end, window_time, car_number
 ```
 
-Let's extend this query to include our driver's position in the race. This is paramount to develop our racing strategy.
-Use the result of the temporal join in this statement.
+</details>
 
-```SQL
+<details>
+<summary>✅ Solution: with the race position</summary>
+
+```sql
 WITH enriched AS (
       SELECT
         t.car_number, 
@@ -391,23 +503,38 @@ FROM TABLE(TUMBLE(TABLE enriched, DESCRIPTOR(event_time), INTERVAL '20' SECOND))
 GROUP BY window_start, window_end, window_time, car_number
 ```
 
-You can stop this query.
+</details>
 
-### 2.3 ML-Anomalies
+Stop the query when you're done.
 
-We have developed a statement that gives us the position of our driver and the state of their car in real-time.
+**Learn more**
 
-In this section we will use Machine Learning to spot anomalies in tire degradation.
+- [Windowing Table-Valued Functions](https://docs.confluent.io/cloud/current/flink/reference/queries/window-tvf.html), with [examples for each function](https://docs.confluent.io/cloud/current/flink/reference/queries/window-tvf.html#examples)
+- [Window Aggregation Queries](https://docs.confluent.io/cloud/current/flink/reference/queries/window-aggregation.html)
 
-Thankfully, we can use Flink's built-in ML models.
+### 2.4 Detect anomalies with built-in ML
 
-> [!NOTE]Confluent Cloud for Apache Flink comes with multiple built-in functions for ML and AI inference, as documented in our [public docs](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html).
+**What you'll learn:** how to run Confluent's built-in `ML_DETECT_ANOMALIES` function over an `OVER` window to flag outliers in a time series.
 
-The [`ML_DETECT_ANOMALIES`](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html#ml-detect-anomalies) function uses an ARIMA model to identify outliers in our time-series data.
+We now have a statement that gives us the position of our driver and the state of their car in real time. In this step, we use machine learning to spot anomalies in tire degradation.
 
-Reuse the previous statement to spot anomalies in the **front left tire temperature**.
+Thankfully, we can use Flink's built-in ML functions. The `ML_DETECT_ANOMALIES` function uses an ARIMA model to identify outliers in our time-series data.
 
-```SQL
+**Your task:** reuse the previous statement to spot anomalies in the **front-left tire temperature** (`tire_temp_fl_c`).
+
+<details>
+<summary>💡 Hint</summary>
+
+- Wrap the window aggregation from 2.3 in a second CTE (for example `windowed`), and select from it.
+- `ML_DETECT_ANOMALIES(value, timestamp, config)` runs over an `OVER` window. Use `tire_temp_fl_c` as the value and `window_time` as the timestamp, and order the window by `window_time` for each car (`PARTITION BY car_number`).
+- Pass the configuration with `JSON_OBJECT(...)`. The detector needs some history before it can flag anything: `'minTrainingSize' VALUE 12` makes it wait for 12 windows.
+
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+```sql
 WITH enriched AS (
 SELECT
   t.car_number, 
@@ -454,34 +581,49 @@ SELECT *,
 FROM windowed
 ```
 
-The idea behind `OVER` windows in Flink SQL is that you can have a window that ends with the current row, and that stretches backwards through the history of the stream for a specific interval, either measured in time, or by some number of rows.
+The idea behind `OVER` windows in Flink SQL is that you can have a window that ends with the current row, and that stretches backwards through the history of the stream for a specific interval, measured either in time or by some number of rows.
 
-The query above executes the anomaly detection by car (in our case we only have 1 car collecting telemetry over, but this could be reused when we get a second car) in ascending `window_time` order.
+The query above runs the anomaly detection per car, in ascending `window_time` order. In our case only one car collects telemetry, but the same query would work for a second car.
 
-Here, `window_time` is the time attribute produced by the tumbling-window query. Together with `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, it gives the detector a cumulative frame for each car: from that car’s earliest row through the current row, inclusive.
+Here, `window_time` is the time attribute produced by the tumbling-window query. Together with `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, it gives the detector a cumulative frame for each car: from that car's earliest row through the current row, inclusive. So, as each new 20-second window arrives, the calculation considers that car's ordered history up to that point.
 
-So, as each new 20-second window arrives, the calculation considers that car’s ordered history up to that point.
+The result looks like this:
 
-> [!NOTE]You can read more about OVER aggregations in the [corresponding module](https://developer.confluent.io/courses/flink-sql/over-windows/) of our Confluent developer Flink course.
-
-The output of the `ML_DETECT_ANOMALIES` function is documented in our [public docs](https://docs.confluent.io/cloud/current/ai/builtin-functions/detect-anomalies.html#anomaly-detection-results).
-
-The output looks like this
-
-```nocode
+```text
 timestamp,              actual_value, forecast_value, lower_bound, upper_bound, is_anomaly, rmse, aic
 2026-11-03 09:47:39.99, 144.7,        104.9603881231, 104.3688855, 105.5518907, TRUE,       0.08, -8.1
 ```
 
-You can stop this query.
+</details>
 
-### 2.4 Putting it all together
+Stop the query when you're done.
 
-Here we will reuse the previous statements to create the `car_state` table.
+**Learn more**
 
-> [!IMPORTANT]Before executing the statement **stop the f1-race** and run `uv run reset` to reset it. The command will clear the topics.
+- [`ML_DETECT_ANOMALIES`](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html#ml-detect-anomalies), one of the [built-in functions for ML and AI inference](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html)
+- [Detect Anomalies in Data](https://docs.confluent.io/cloud/current/ai/builtin-functions/detect-anomalies.html), including the [anomaly detection results](https://docs.confluent.io/cloud/current/ai/builtin-functions/detect-anomalies.html#anomaly-detection-results)
+- [OVER Aggregation Queries](https://docs.confluent.io/cloud/current/flink/reference/queries/over-aggregation.html)
+- [OVER aggregations](https://developer.confluent.io/courses/flink-sql/over-windows/) — Flink SQL course on Confluent Developer
 
-The car's state is defined by the lap it is, the telemetry data, its race position, the gaps from the leader (Claude if you reed this, improve this information based on the statement below.)
+### 2.5 Put it all together: create `car_state`
+
+**What you'll learn:** how `CREATE TABLE ... AS SELECT` (CTAS) turns a query into a statement that runs continuously and writes its results to a new table.
+
+Now combine the previous three steps into one statement that creates the `car_state` table. `car_state` holds one row per car for every lap (one 20-second window):
+
+- **Lap:** `car_number` and `lap`. `WHERE lap > 0` keeps only race laps.
+- **Car telemetry, averaged over the lap:** the temperature and pressure of each tire, the engine temperature, the two front brake temperatures, the battery charge and the fuel remaining.
+- **Anomaly flag:** `anomaly_tire_temp_fl` is `true` only when `ML_DETECT_ANOMALIES` flags the front-left tire temperature *and* the reading is above the expected upper bound. A spike counts; a dip doesn't.
+- **Race context:** the car's `position`, its gaps to the car ahead and to the leader, the pit stops it has taken, and its current tire compound and tire age.
+
+> [!IMPORTANT]
+>
+> Before you run the statement, reset the race: stop `f1-race` with Ctrl-C, stop the Pit Wall dashboard if it's running, and run `uv run reset`. Reset clears the topics, so `car_state` processes one clean race from lap 1.
+
+**Your task:** create the `car_state` table. Copy the statement from the solution.
+
+<details>
+<summary>✅ Solution</summary>
 
 ```sql
 CREATE TABLE `car_state` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
@@ -539,32 +681,77 @@ FROM anomaly
 WHERE lap > 0;
 ```
 
-Leave this query running!
+The `WITH` options shape the new table:
+
+- `'changelog.mode' = 'append'` makes `car_state` an insert-only stream.
+- `'kafka.consumer.isolation-level' = 'read-uncommitted'` lets statements that read `car_state`, such as `pit_decisions` in section 4, see each row as soon as it's written instead of waiting for its transaction to commit.
+
+</details>
+
+**Leave this statement running**, and wait until it shows **Running**. Then continue with [section 3](#3-start-the-race).
+
+**Learn more**
+
+- [CREATE TABLE AS SELECT (CTAS)](https://docs.confluent.io/cloud/current/flink/reference/statements/create-table.html#create-table-as-select-ctas)
+- [The `kafka.consumer.isolation-level` option](https://docs.confluent.io/cloud/current/flink/reference/statements/create-table.html#kafka-consumer-isolation-level)
+- [Monitor and Manage Flink SQL Statements](https://docs.confluent.io/cloud/current/flink/operate-and-deploy/monitor-statements.html)
 
 ## 3. Start the race
 
-(Claude: Here we need to reference the section at the end of the readme about how the user can achieve a clean slate.)
+With `car_state` running, start the race again and watch the car's state build up lap by lap.
 
-`car_state` emits one row per 20-second window. After 12 windows (~4 minutes) it has enough history to detect temperature anomalies on the front-left tire; at lap 24 the tire spikes to ~145°C and `anomaly_tire_temp_fl` becomes `true`.
+> [!TIP]
+>
+> If at any point the data looks wrong or your queries return nothing, for example after the race restarted, follow [Start from a clean slate](#start-from-a-clean-slate).
 
-Verify that the `car_state` stream
+### 3.1 Start the race and open the Pit Wall
+
+1. Start the Pit Wall dashboard, and leave it running:
+
+    ```bash
+    uv run f1-pitwall
+    ```
+
+2. In a second terminal, start the race, and leave it running:
+
+    ```bash
+    uv run f1-race
+    ```
+
+3. Open [localhost:8000](http://localhost:8000).
+
+The dashboard shows the Silverstone track map, the live leaderboard, and car #88's tire and fuel gauges. The **Anomaly Detection** panel unlocks as `car_state` emits rows, and the **AI Pit Strategist** panel unlocks once you create `pit_decisions` in section 4.
+
+![Pit Wall dashboard showing a nominal front-left tire temperature](../assets/self-service/pitwall-nominal.png)
+
+### 3.2 Watch `car_state` fill up
+
+**What you'll learn:** how `car_state` evolves lap by lap, and when the anomaly detector has enough history to flag a spike.
+
+`car_state` emits one row per 20-second window. After 12 windows (about 4 minutes), it has enough history to detect temperature anomalies on the front-left tire. At lap 24, the tire spikes to about 145°C and `anomaly_tire_temp_fl` becomes `true`.
+
+Verify that `car_state` is filling up:
 
 ```sql
 SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_temp_fl, tire_temp_fl_c
 FROM `car_state`;
 ```
 
-You can stop this query.
+Stop the query when you're done. The `car_state` statement keeps running.
 
-The dashboard at [localhost:8000](http://localhost:8000) shows the Silverstone track map, the live leaderboard, and car #88's tyre/fuel gauges. The **Anomaly Detection** panel unlocks as `car_state` emits rows, and the **AI Pit Strategist** panel unlocks once you create `pit_decisions` in Section 3.
+<details>
+<summary>🛠️ Troubleshooting</summary>
 
-![Pit Wall dashboard showing a nominal front-left tire temperature](../assets/self-service/pitwall-nominal.png)
+- **`car_state` is empty at first.** `car_state` emits one row per 20-second window, and `f1-race` aligns lap 1 to the next 20-second wall-clock boundary before starting. Make sure `car_state` is **Running** before starting `uv run f1-race`.
+- **No anomaly around lap 24.** `ML_DETECT_ANOMALIES` needs 12 windows of context (`minTrainingSize = 12`) before lap 24. If `car_state` was started mid-race after lap 12, reset and start `car_state` before `uv run f1-race`.
 
-## 4. Create a Strategy using Streaming Agents
+</details>
 
-In this section we will deploy a Streaming Agent that will use the `car_state` information to define our strategy.
+## 4. Create a strategy using Streaming Agents
 
-Our `pit_strategy_agent` will evaluate the car condition and race context on every lap and recommend
+In this section, you deploy a Streaming Agent that uses the `car_state` information to define our strategy.
+
+Our `pit_strategy_agent` evaluates the car's condition and the race context on every lap, and recommends one of:
 
 - `STAY OUT`
 - `PIT SOON`
@@ -572,23 +759,28 @@ Our `pit_strategy_agent` will evaluate the car condition and race context on eve
 
 ### 4.1 The model
 
-You can use your own external model for inference, as described in our [public docs](https://docs.confluent.io/cloud/current/ai/ai-model-inference.html).
+**What you'll learn:** which models your Flink statements can call for inference.
 
-However, in this demo we will use the Confluent-hosted models.
+You can use your own external model for inference. In this workshop, we use a Confluent-hosted model that your platform team created for you.
 
-You can see which models are available by running the following statement
+List the available models, as you did in 1.2:
 
 ```sql
-SHOW models;
+SHOW MODELS;
 ```
 
-We will use the `llm_textgen_model`.
+We'll use `llm_textgen_model`.
+
+**Learn more**
+
+- [Run External Model Inference](https://docs.confluent.io/cloud/current/ai/ai-model-inference.html)
+- [CREATE MODEL Statement](https://docs.confluent.io/cloud/current/flink/reference/statements/create-model.html)
 
 ### 4.2 The agent
 
-Now we create the agent.
+**What you'll learn:** how `CREATE AGENT` combines a model and a prompt into a Streaming Agent you can call from Flink SQL.
 
-The syntax is fairly simple
+The syntax is fairly simple:
 
 ```sql
 CREATE AGENT `agent_name`
@@ -596,7 +788,10 @@ USING MODEL `llm_textgen_model`
 USING PROMPT 'Your prompt';
 ```
 
-Create our strategy agent with the following statement.
+**Your task:** create the `pit_strategy_agent`. Its prompt is long, so copy the statement from the solution.
+
+<details>
+<summary>✅ Solution</summary>
 
 ```sql
 CREATE AGENT `pit_strategy_agent`
@@ -649,19 +844,34 @@ TIRE STRATEGY at Silverstone (60-lap race):
 WITH ('max_iterations' = '10');
 ```
 
+The prompt has three parts:
+
+- **Output format:** seven labeled lines, which `pit_decisions` parses into columns in the next step, with an example of a correct `STAY OUT` and a correct `PIT NOW` answer.
+- **Role and decision framework:** the agent is River Racing's pit wall strategist, and it reserves `PIT NOW` for the anomaly flag.
+- **Tire strategy** for the 60-lap race at Silverstone, including John Doe's historical best strategy.
+
+`'max_iterations' = '10'` caps how many times the agent can call tools while it answers.
+
+</details>
+
 Confirm that the agent is registered:
 
 ```sql
 SHOW AGENTS;
 ```
 
+**Learn more**
+
+- [Streaming Agents with Confluent Intelligence](https://docs.confluent.io/cloud/current/ai/streaming-agents/overview.html)
+- [CREATE AGENT Statement](https://docs.confluent.io/cloud/current/flink/reference/statements/create-agent.html)
+
 ### 4.3 Create the strategy table
 
-Next we create the `pit_decisions` table, which invokes `pit_strategy_agent` on every row of `car_state` using [`AI_RUN_AGENT`](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html#ai-run-agent) and parses the structured fields.
+**What you'll learn:** how `AI_RUN_AGENT` calls an agent for every row of a stream, and how to parse the agent's text answer into columns.
 
-Because it reads `car_state` from `earliest-offset`, it also processes laps that have already arrived.
+The `pit_decisions` table invokes `pit_strategy_agent` on every row of `car_state` using `AI_RUN_AGENT`, and parses the structured fields out of its answer.
 
-A simplified version of the statement we need to create looks like this:
+A simplified version of the statement looks like this:
 
 ```sql
 CREATE TABLE `final_table_name` AS
@@ -675,7 +885,12 @@ LATERAL TABLE(AI_RUN_AGENT(
 ));
 ```
 
-However, we need to do a lot of string concatenation, so you can directly copy the statement. Functionally, the same thing happens in the above and below statement:
+The real statement needs a lot of string concatenation to build the agent's input, but functionally it does the same thing.
+
+**Your task:** create the `pit_decisions` table. Copy the statement from the solution.
+
+<details>
+<summary>✅ Solution</summary>
 
 ```sql
 CREATE TABLE `pit_decisions` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
@@ -713,11 +928,13 @@ LATERAL TABLE(AI_RUN_AGENT(
 ));
 ```
 
-Leave this query running!
+</details>
 
-The agent processes the data from the previous laps as well, so our pitwall should display the agent's decision for previous laps as well.
+**Leave this statement running.**
 
-Query `pit_decisions` in your SQL Workspace to see the streaming recommendations:
+Because it reads `car_state` from `earliest-offset`, it also processes the laps that have already arrived, so the Pit Wall shows the agent's decisions for the previous laps too.
+
+Query `pit_decisions` to see the streaming recommendations:
 
 ```sql
 SELECT lap, `position`, suggestion, condition_summary, reasoning
@@ -735,63 +952,98 @@ WHERE anomaly_tire_temp_fl = true;
 
 ![Pit Wall dashboard with both Anomaly Detection and AI Pit Strategist panels unlocked, showing the PIT NOW call at lap 24](../assets/self-service/pitwall-pit-now.png)
 
-------------------------------------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------------------------------------
+Stop these queries when you're done. The `pit_decisions` statement keeps running.
+
+**Learn more**
+
+- [`AI_RUN_AGENT`](https://docs.confluent.io/cloud/current/flink/reference/functions/model-inference-functions.html#ai-run-agent)
+- [Create and Run Streaming Agents](https://docs.confluent.io/cloud/current/ai/streaming-agents/create-and-run-streaming-agents.html)
+- [Debug Streaming Agents](https://docs.confluent.io/cloud/current/ai/streaming-agents/debug-streaming-agents.html)
+
+<details>
+<summary>🛠️ Troubleshooting</summary>
+
+- **The agent's fields are null.** Inspect `SELECT lap, suggestion, raw_response FROM pit_decisions LIMIT 5;`. If `raw_response` is empty across the board, the agent's Confluent-hosted model isn't answering: ask your platform team to check that it's offered in your organization's region.
+
+</details>
 
 ## 5. Expose `car_telemetry` to AI agents with Real-Time Context Engine
 
-Real-Time Context Engine (RTCE) exposes a Kafka topic as an MCP tool, so any MCP-compatible AI agent can query the live stream. The RTCE key on your credential card is the Global key your deploy created, so `uv run setup-rtce` doesn't ask for another one, and you enable RTCE **per topic in the Console** for `car_telemetry` (and optionally `car_state` or `pit_decisions`).
+Real-Time Context Engine (RTCE) exposes a Kafka topic as an MCP tool, so any MCP-compatible AI agent can query the live stream.
 
-1. Under your environment's cluster, open **[Topics](https://confluent.cloud/go/topics) → `car_telemetry`**, open the **Real-Time Context Engine** panel, and click **Enable** (or **Turn on**). Once enabled, the **Topics** list shows Real-Time Context Engine **On**:
+### 5.1 Enable RTCE on `car_telemetry`
 
-    ![Topics list with the Real-Time Context Engine column](../assets/self-service/rtce-topics-list.png)
+**What you'll learn:** how to make a topic available to AI agents through the Real-Time Context Engine.
 
-    The panel displays the enablement details — environment, cluster, cloud, and region — that an MCP client uses to reach it:
+You enable RTCE **per topic in the Console**. Under your environment's cluster, open **[Topics](https://confluent.cloud/go/topics) → `car_telemetry`**, open the **Real-Time Context Engine** panel, and click **Enable** (or **Turn on**). Once it's enabled, the **Topics** list shows Real-Time Context Engine **On**:
 
-    ![Real-Time Context Engine enabled for car_telemetry](../assets/self-service/rtce-enabled.png)
+![Topics list with the Real-Time Context Engine column](../assets/self-service/rtce-topics-list.png)
 
-2. Point your coding agent at it in one command:
+The panel displays the enablement details (environment, cluster, cloud and region) that an MCP client uses to reach it:
 
-    ```bash
-    uv run setup-rtce
-    ```
+![Real-Time Context Engine enabled for car_telemetry](../assets/self-service/rtce-enabled.png)
 
-    This registers RTCE as an MCP server with Claude Code (or prints a config snippet for Codex CLI), using the `F1_RTCE_MCP_ENDPOINT`, `F1_RTCE_API_KEY`, and `F1_RTCE_API_SECRET` fields on your credential card. Restart your coding agent, then ask questions in plain English:
+You can optionally enable RTCE on `car_state` or `pit_decisions` the same way. The challenges below use them.
 
-    ```text
-    What topics do I have access to in the Real-Time Context Engine?
-    ```
+**Learn more**
 
-    ![Claude listing the topics enabled in the Real-Time Context Engine](../assets/hosted/rtce-listtopics.png)
+- [Real-Time Context Engine](https://docs.confluent.io/cloud/current/ai/real-time-context-engine/overview.html)
 
-    ```text
-    How has the engine temperature been trending over the last few laps?
-    ```
+### 5.2 Connect your coding agent
 
-    ![Claude answering how the engine temperature has trended over the last few laps by calling the Real-Time Context Engine](../assets/self-service/rtce-engine-trend.png)
+Point your coding agent at RTCE in one command:
 
-    ```text
-    What's the front-left tire temperature on car 88 right now?
-    ```
+```bash
+uv run setup-rtce
+```
 
-    ![Claude answering the front-left tire temperature question by calling the Real-Time Context Engine](../assets/hosted/rtce-cartemp.png)
+This registers RTCE as an MCP server with Claude Code (or prints a config snippet for Codex CLI), using the `F1_RTCE_MCP_ENDPOINT`, `F1_RTCE_API_KEY`, and `F1_RTCE_API_SECRET` fields on your credential card. The RTCE key on your card is the Global key your deploy created, so `uv run setup-rtce` doesn't ask for another one.
 
-    ```text
-    At what lap in the race does the engine temperature peak?
-    ```
+Restart your coding agent.
 
-    ```text
-    What is the front right tire temperature at lap 30?
-    ```
+### 5.3 Ask questions in plain English
+
+**What you'll learn:** how an AI agent answers questions about a live stream by calling the Real-Time Context Engine.
+
+Ask your coding agent:
+
+```text
+What topics do I have access to in the Real-Time Context Engine?
+```
+
+![Claude listing the topics enabled in the Real-Time Context Engine](../assets/hosted/rtce-listtopics.png)
+
+```text
+How has the engine temperature been trending over the last few laps?
+```
+
+![Claude answering how the engine temperature has trended over the last few laps by calling the Real-Time Context Engine](../assets/self-service/rtce-engine-trend.png)
+
+```text
+What's the front-left tire temperature on car 88 right now?
+```
+
+![Claude answering the front-left tire temperature question by calling the Real-Time Context Engine](../assets/hosted/rtce-cartemp.png)
+
+```text
+At what lap in the race does the engine temperature peak?
+```
+
+```text
+What is the front right tire temperature at lap 30?
+```
 
 ## 🧩 Challenge #1 — Social Media Agent (Claude + Real-Time Context Engine)
 
-Now, it's time to switch gears and take on the role of the social media team for River Racing. You've been given access to the live race data via RTCE and need to use AI to generate an engaging social media post. Based on what you've learned in the workshop, do the following:
+**What you'll learn:** how to ground an AI agent's output in live race data through the Real-Time Context Engine.
 
-1. Enable RTCE on the `car_state` and `pit_decisions` topics in the Confluent Cloud Console (the same way you enabled `car_telemetry` above).
-2. Create a persona prompt for your agent to help it develop an engaging social media post.
-3. Have your agent draft a post using real time data from your MCP connection.
+Now, it's time to switch gears and take on the role of the social media team for River Racing. You've been given access to the live race data via RTCE and need to use AI to generate an engaging social media post.
+
+**Your task:** based on what you've learned in the workshop:
+
+1. Enable RTCE on the `car_state` and `pit_decisions` topics in the Confluent Cloud Console, the same way you enabled `car_telemetry` in 5.1.
+2. Create a persona prompt that helps your agent develop an engaging social media post.
+3. Have your agent draft a post using real-time data from your MCP connection.
 
 Feel free to use one of the following prompts to draft your next post:
 
@@ -799,13 +1051,22 @@ Feel free to use one of the following prompts to draft your next post:
 - "The pit wall just made a call. Draft a post about our strategy."
 - "Write a 3-tweet recap thread of John's race so far."
 
-**Success looks like:** Claude calls `queryData` against `car_state` and `pit_decisions` (you'll see the tool calls in the transcript) and returns a drafted post citing the real lap number, position, and strategy call from your live feed — not invented numbers. If it says the feed is quiet, the race may not be running yet, or RTCE isn't enabled on one of the two topics.
+**Success looks like:** Claude calls `queryData` against `car_state` and `pit_decisions` (you'll see the tool calls in the transcript) and returns a drafted post citing the real lap number, position, and strategy call from your live feed — not invented numbers.
+
+<details>
+<summary>🛠️ Troubleshooting</summary>
+
+- **Claude says the feed is quiet.** The race may not be running yet, or RTCE isn't enabled on one of the two topics.
+
+</details>
 
 ## 🧩 Challenge #2 — Analyze race data with Lightning Queries
 
-Now, we'll see how this real-time context becomes queryable with Lightning Tables and Lightning Queries. Lightning Queries read an RTCE-enabled topic over low-latency REST, so enable RTCE on `car_telemetry` in the Console first if you haven't already.
+**What you'll learn:** how Lightning Tables and Lightning Queries make real-time context queryable with SQL.
 
-From the repo directory, print a ready-to-run query:
+Lightning Queries read an RTCE-enabled topic over low-latency REST, so enable RTCE on `car_telemetry` in the Console first if you haven't already (see 5.1).
+
+Print a ready-to-run query:
 
 ```bash
 uv run setup-rtce --lightning
@@ -813,7 +1074,7 @@ uv run setup-rtce --lightning
 
 Copy the printed `curl` command into your terminal and run it. It returns the last 10 telemetry rows by lap; edit the SQL in `query` to filter for car 88 or select other columns.
 
-**Your challenge:** enable RTCE on `pit_decisions` in the Console. Then edit the `curl` command's `query` to find out what tire compound the agent recommended on lap 24, and why.
+**Your task:** enable RTCE on `pit_decisions` in the Console. Then edit the `curl` command's `query` to find out which tire compound the agent recommended on lap 24, and why:
 
 ```sql
 SELECT lap, <column>, <column> FROM pit_decisions WHERE lap = 24 LIMIT 1
@@ -821,17 +1082,71 @@ SELECT lap, <column>, <column> FROM pit_decisions WHERE lap = 24 LIMIT 1
 
 Fill in the first `<column>` with the recommended tire compound, and the second with the agent's reasoning for that call.
 
-## Run the workshop again or tear it down
+<details>
+<summary>💡 Hint</summary>
 
-Stop `f1-race` with Ctrl-C when you finish. Use `reset` when you want to erase the race history and repeat the workshop from a clean slate:
+The column names are the aliases in the `CREATE TABLE pit_decisions` statement from 4.3. Look for the `AS ...` after the expressions that extract **Recommended Compound** and **Reasoning**.
 
-```bash
-uv run reset
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+```sql
+SELECT lap, recommended_tire_compound, reasoning FROM pit_decisions WHERE lap = 24 LIMIT 1
 ```
 
-It uses your Confluent CLI session from [section 0](#0-sign-in-install-and-connect). If that session has expired, it asks you to sign in; with SSO, press **Enter** at the email prompt and accept the single sign-on login.
+</details>
 
-After reset, recreate `car_state`, wait for it to show **Running**, then start `uv run f1-race` again (or run `uv run reset --with-labs` to rebuild `car_state`, `pit_strategy_agent`, and `pit_decisions` automatically before starting `uv run f1-race`).
+**Learn more**
+
+- [Lightning Tables](https://docs.confluent.io/cloud/current/lightning-tables/overview.html)
+- [Query a Lightning Table with the API](https://docs.confluent.io/cloud/current/lightning-tables/query/api.html)
+
+## Run the workshop again or tear it down
+
+Stop `f1-race` with Ctrl-C when you finish.
+
+### Start from a clean slate
+
+Use this when you want to erase the race history and repeat the workshop, or when the data looks wrong or your queries return nothing, for example after the race restarted.
+
+1. Stop `f1-race` with Ctrl-C.
+2. Stop the Pit Wall dashboard (`f1-pitwall`, on port `8000`): press Ctrl-C in its terminal, or, if the deploy started it in the background, run the `kill` command the deploy printed.
+3. Reset:
+
+    ```bash
+    uv run reset
+    ```
+
+    It stops your Flink statements, drops `car_state`, `pit_strategy_agent` and `pit_decisions`, and clears the race data from the source topics.
+
+4. If you had created `car_state`, recreate it ([2.5](#25-put-it-all-together-create-car_state)) and wait for it to show **Running**. Recreate `pit_strategy_agent` and `pit_decisions` (section 4) too if you had built them.
+
+    Alternatively, run `uv run reset --with-labs` in step 3: it rebuilds `car_state`, `pit_strategy_agent` and `pit_decisions` for you.
+
+5. Start the Pit Wall dashboard:
+
+    ```bash
+    uv run f1-pitwall
+    ```
+
+6. In a second terminal, start the race, and leave it running:
+
+    ```bash
+    uv run f1-race
+    ```
+
+7. Open [localhost:8000](http://localhost:8000).
+
+<details>
+<summary>🛠️ Troubleshooting</summary>
+
+- **`uv run reset` asks you to sign in.** It uses your Confluent CLI session from [0.3](#03-explore-your-environment-from-the-cli). If that session has expired, it asks you to sign in; with SSO, press **Enter** at the email prompt and accept the single sign-on login.
+
+</details>
+
+### Tear it down
 
 When you're done with the workshop, run:
 
@@ -839,25 +1154,13 @@ When you're done with the workshop, run:
 uv run destroy
 ```
 
-It deletes the three API keys the deploy created for you, Global key last, and your credential card. Your environment and everything in it stay: they belong to your platform team, who delete them afterwards. It lists the keys, and says so, before it asks you to confirm. Afterwards, it asks whether to delete `credentials.env` too (default **yes**).
-
-If it stops partway, run it again: it deletes only what's left. If your credential card is gone, or its Global key no longer works, it lists the keys for you to delete in the Console under **API keys** → **My account**.
+It deletes the three API keys the deploy created for you, Global key last, and your credential card. Your environment and everything in it stay: they belong to your platform team, who delete them afterwards. Before it asks you to confirm, it lists the keys and tells you that your environment stays. Afterwards, it asks whether to delete `credentials.env` too (default **yes**).
 
 <details>
-<summary>Troubleshooting</summary>
+<summary>🛠️ Troubleshooting</summary>
 
-- **`car_state` is empty at first.** `car_state` emits one row per 20-second window, and `f1-race` aligns lap 1 to the next 20-second wall-clock boundary before starting. Make sure `car_state` is **Running** before starting `uv run f1-race`.
-- **No anomaly around lap 24.** `ML_DETECT_ANOMALIES` needs 12 windows of context (`minTrainingSize = 12`) before lap 24. If `car_state` was started mid-race after lap 12, reset and start `car_state` before `uv run f1-race`.
-- **Agent fields are null but `raw_response` has text.** Inspect `SELECT lap, suggestion, raw_response FROM pit_decisions LIMIT 5;`. If `raw_response` is empty across the board, the agent's Confluent-hosted model isn't answering: ask your platform team to check that it's offered in your organization's region.
-- **`No credential card found` / `Multiple credential cards found`.** Pass `--creds runs/pre-provisioned/credentials/DEMO.env` or re-run `uv run deploy --track pre-provisioned` to refresh `F1_CARD` in `credentials.env`.
-- If at any point the data looks messed up, the queries don't output anything, it may be caused by the race restarting. To achieve a clean slate at any moment, follow the steps below:
-    1. Stop the python script that runs the `f1-race`.
-    2. Stop the python script that runs the `f1-pitwall`. This process runs on port `8000`.
-    3. Run `uv run reset`.
-    4. Start the pitwall `uv run f1-pitwall`.
-    5. Start the race `uv run f1-race`.
-    6. Leave it running.
-    7. Open [localhost:8000](http://localhost:8000)
+- **`uv run destroy` stopped partway.** Run it again: it deletes only what's left.
+- **Your credential card is gone, or its Global key no longer works.** `uv run destroy` lists the keys for you to delete in the Console under **API keys** → **My account**.
 
 </details>
 
