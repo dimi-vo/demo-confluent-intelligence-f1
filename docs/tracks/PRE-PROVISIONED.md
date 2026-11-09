@@ -1,6 +1,11 @@
 # Pre-provisioned workshop walkthrough
 
-**Interactive guide:** open [`docs/site/pre-provisioned.html`](../site/pre-provisioned.html) in your browser for a step-by-step version of this walkthrough that tracks your progress.
+---
+---
+THIS A LONG README, MAYBE YOU WANT TO GO TO [https://dimi-vo.github.io/demo-confluent-intelligence-f1/#welcome](https://dimi-vo.github.io/demo-confluent-intelligence-f1/#welcome) INSTEAD.
+
+---
+---
 
 ![F1 Pit Wall Confluent Intelligence architecture](../assets/architecture.png)
 
