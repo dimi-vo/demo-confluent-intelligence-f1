@@ -4,7 +4,10 @@ local coding agent, using this deployment's credential card.
 
     uv run setup-rtce                   # resolved card, prompts for client(s)
     uv run setup-rtce --creds <card>.env
-    uv run setup-rtce --client codex     # print the Codex config snippet
+    uv run setup-rtce --client codex     # merge into ~/.codex/config.toml
+    uv run setup-rtce --client vscode    # GitHub Copilot in VS Code
+    uv run setup-rtce --client copilot   # GitHub Copilot CLI
+    uv run setup-rtce --client all       # every agent above
     uv run setup-rtce --lightning        # print a ready-to-run curl command
     uv run setup-rtce --dry-run          # print the argv, touch no agent config
 
@@ -30,6 +33,17 @@ server and never needs a header at all. This script instead edits
 the file (comments, other tables, formatting) on round-trip. If the existing
 file can't be parsed, it falls back to printing the snippet instead of
 guessing.
+
+GitHub Copilot CLI: registered with `copilot mcp add --transport http --header`,
+which writes the user-global ~/.copilot/mcp-config.json (or $COPILOT_HOME's).
+Remove-then-add, like Claude Code, so a rerun replaces the entry.
+
+GitHub Copilot in VS Code: registered with `code --add-mcp '<json>'`, which
+writes the server (VS Code format: type/url/headers) into the user profile's
+mcp.json, so it serves every workspace.
+
+Every run, successful or not, ends with the manual steps for each chosen agent,
+so a registration that silently didn't take can be redone by hand.
 """
 
 from __future__ import annotations
@@ -54,6 +68,14 @@ from scripts.common.terraform import get_project_root
 from scripts.common.ui import prompt_secret
 
 _SERVER_NAME = "real-time-context-engine"
+
+# --client value -> the agent's display name, in menu order.
+_CLIENTS = {
+    "claude": "Claude Code",
+    "codex": "Codex CLI",
+    "vscode": "GitHub Copilot in VS Code",
+    "copilot": "GitHub Copilot CLI",
+}
 
 _EXPECTED_CARD_KEYS = ("F1_RTCE_MCP_ENDPOINT", "F1_RTCE_API_KEY", "F1_RTCE_API_SECRET")
 
@@ -170,38 +192,137 @@ def codex_config_snippet(endpoint: str, token: str) -> str:
     return f'[mcp_servers.{_SERVER_NAME}]\nurl = "{endpoint}"\nhttp_headers = {{ "Authorization" = "Basic {token}" }}\n'
 
 
-def register_claude(endpoint: str, token: str, dry_run: bool = False) -> bool:
-    remove_argv, add_argv = claude_argv(endpoint, token)
+def copilot_cli_argv(endpoint: str, token: str) -> tuple[list[str], list[str]]:
+    """The (remove, add) argv pair for GitHub Copilot CLI."""
+    return (
+        ["copilot", "mcp", "remove", _SERVER_NAME],
+        [
+            "copilot",
+            "mcp",
+            "add",
+            "--transport",
+            "http",
+            "--header",
+            f"Authorization: Basic {token}",
+            _SERVER_NAME,
+            endpoint,
+        ],
+    )
 
+
+def vscode_server_entry(endpoint: str, token: str) -> dict:
+    """The VS Code-format server entry (`servers` table of mcp.json)."""
+    return {"type": "http", "url": endpoint, "headers": {"Authorization": f"Basic {token}"}}
+
+
+def vscode_argv(endpoint: str, token: str) -> list[str]:
+    """`code --add-mcp` takes one JSON object: the entry plus its `name`."""
+    return ["code", "--add-mcp", json.dumps({"name": _SERVER_NAME, **vscode_server_entry(endpoint, token)})]
+
+
+def _register_with_cli(
+    label: str,
+    remove_argv: list[str] | None,
+    add_argv: list[str],
+    install_hint: str,
+    done: str,
+    dry_run: bool,
+) -> bool:
+    """Run an agent's own `mcp add` command, after its `mcp remove` when it has one."""
     if dry_run:
-        print("[dry-run] Claude Code — would run:")
-        print(f"    {shlex.join(remove_argv)}")
+        print(f"[dry-run] {label} — would run:")
+        if remove_argv:
+            print(f"    {shlex.join(remove_argv)}")
         print(f"    {shlex.join(add_argv)}")
         return True
 
     try:
-        _run(remove_argv, capture_output=True)
+        if remove_argv:
+            _run(remove_argv, capture_output=True)
         result = _run(add_argv, capture_output=True, text=True)
     except FileNotFoundError:
-        print("Error: 'claude' not found — Claude Code is not installed.")
-        print("  Install it: https://claude.com/product/claude-code")
+        print(f"Error: '{add_argv[0]}' not found — {install_hint}")
         return False
 
     if result.returncode != 0:
-        print("Error: Claude Code refused the registration:")
+        print(f"Error: {label} refused the registration:")
         detail = (result.stderr or result.stdout or "").strip()
         if detail:
             print("  " + detail.replace("\n", "\n  "))
         return False
 
-    print(f"Registered '{_SERVER_NAME}' with Claude Code — local scope (this project)")
+    print(done)
     return True
 
 
-def print_codex_instructions(endpoint: str, token: str) -> None:
-    print("Codex CLI has no confirmed flag for a Basic-auth header, so add this")
-    print("block to ~/.codex/config.toml by hand:\n")
-    print(codex_config_snippet(endpoint, token))
+def register_claude(endpoint: str, token: str, dry_run: bool = False) -> bool:
+    remove_argv, add_argv = claude_argv(endpoint, token)
+    return _register_with_cli(
+        "Claude Code",
+        remove_argv,
+        add_argv,
+        "Claude Code is not installed.\n  Install it: https://claude.com/product/claude-code",
+        f"Registered '{_SERVER_NAME}' with Claude Code — local scope (this project)",
+        dry_run,
+    )
+
+
+def register_copilot_cli(endpoint: str, token: str, dry_run: bool = False) -> bool:
+    remove_argv, add_argv = copilot_cli_argv(endpoint, token)
+    return _register_with_cli(
+        "GitHub Copilot CLI",
+        remove_argv,
+        add_argv,
+        "GitHub Copilot CLI is not installed.\n  Install it: npm install -g @github/copilot",
+        f"Registered '{_SERVER_NAME}' with GitHub Copilot CLI — user scope (~/.copilot/mcp-config.json)",
+        dry_run,
+    )
+
+
+def register_vscode(endpoint: str, token: str, dry_run: bool = False) -> bool:
+    return _register_with_cli(
+        "GitHub Copilot in VS Code",
+        None,
+        vscode_argv(endpoint, token),
+        "VS Code's `code` command is not on your PATH.",
+        f"Registered '{_SERVER_NAME}' with VS Code — user profile (every workspace)",
+        dry_run,
+    )
+
+
+def _indent(text: str, prefix: str = "    ") -> str:
+    return "\n".join(prefix + line if line else line for line in text.rstrip("\n").splitlines())
+
+
+def manual_instructions(client: str, endpoint: str, token: str) -> str:
+    """How to add the server to `client` by hand, without this script."""
+    if client == "claude":
+        remove_argv, add_argv = claude_argv(endpoint, token)
+        return "Claude Code: in this repo directory, run\n" + _indent(
+            shlex.join(remove_argv) + "\n" + shlex.join(add_argv)
+        )
+    if client == "codex":
+        return "Codex CLI: add this to ~/.codex/config.toml\n" + _indent(codex_config_snippet(endpoint, token))
+    if client == "vscode":
+        config = {"servers": {_SERVER_NAME: vscode_server_entry(endpoint, token)}}
+        return (
+            'GitHub Copilot in VS Code: run "MCP: Open User Configuration" and add the server\n'
+            '  under "servers" (an empty file becomes exactly this)\n' + _indent(json.dumps(config, indent=2))
+        )
+    remove_argv, add_argv = copilot_cli_argv(endpoint, token)
+    config = {"mcpServers": {_SERVER_NAME: {**vscode_server_entry(endpoint, token), "tools": ["*"]}}}
+    return (
+        "GitHub Copilot CLI: run\n"
+        + _indent(shlex.join(remove_argv) + "\n" + shlex.join(add_argv))
+        + '\n  or add the server under "mcpServers" in ~/.copilot/mcp-config.json\n'
+        + _indent(json.dumps(config, indent=2))
+    )
+
+
+def print_manual_instructions(clients: list[str], endpoint: str, token: str) -> None:
+    print("\nIf a registration didn't work, add the server by hand:")
+    for client in clients:
+        print("\n" + manual_instructions(client, endpoint, token))
 
 
 def _codex_config_path() -> Path:
@@ -212,8 +333,8 @@ def write_codex_config(endpoint: str, token: str, config_path: Path, dry_run: bo
     """Merge an `[mcp_servers.rtce]` table into `config_path`, in place.
 
     Preserves everything else already in the file. Safe to rerun (replaces any
-    existing `rtce` table). Falls back to printing the manual snippet if the
-    existing file can't be parsed as TOML, rather than risk corrupting it.
+    existing `rtce` table). Leaves a file it can't parse as TOML untouched and
+    returns False, rather than risk corrupting it.
     """
     if dry_run:
         print(f"[dry-run] Codex CLI — would merge into {config_path}:\n")
@@ -239,33 +360,54 @@ def write_codex_config(endpoint: str, token: str, config_path: Path, dry_run: bo
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(tomlkit.dumps(doc))
     except Exception as exc:
-        print(f"Error: couldn't auto-edit {config_path} ({exc}) — add this by hand:\n")
-        print(codex_config_snippet(endpoint, token))
-        return True
+        print(f"Error: couldn't auto-edit {config_path} ({exc}).")
+        return False
 
     print(f"Registered '{_SERVER_NAME}' in {config_path}")
     return True
 
 
+def _parse_client_choice(choice: str) -> list[str] | None:
+    """Menu input -> client keys, in menu order. None if any part is unrecognized.
+
+    Accepts numbers or --client names, several at once ("1,3", "claude vscode").
+    """
+    names = list(_CLIENTS)
+    by_number = {str(i): name for i, name in enumerate(names, start=1)}
+    picked: set[str] = set()
+    for part in re.split(r"[,\s]+", choice.strip().lower()):
+        if not part:
+            continue
+        if part in ("all", str(len(names) + 1)):
+            picked.update(names)
+        elif part == "both":
+            picked.update(("claude", "codex"))
+        elif part in by_number:
+            picked.add(by_number[part])
+        elif part in _CLIENTS:
+            picked.add(part)
+        else:
+            return None
+    return [name for name in names if name in picked] or ["claude"]
+
+
 def _prompt_for_clients() -> list[str]:
     print("Which coding agent(s) should RTCE be registered with?")
-    print("  1) Claude Code")
-    print("  2) Codex CLI")
-    print("  3) Both")
+    for i, label in enumerate(_CLIENTS.values(), start=1):
+        print(f"  {i}) {label}")
+    print(f"  {len(_CLIENTS) + 1}) All of them")
+    print("Pick one, or several separated by commas (for example 1,3).")
     try:
         choice = input("Choice [1]: ").strip()
     except (EOFError, KeyboardInterrupt, OSError):
         print("\nNo input available — defaulting to Claude Code.")
         return ["claude"]
 
-    if choice in ("", "1", "claude"):
+    clients = _parse_client_choice(choice)
+    if clients is None:
+        print(f"Unrecognized choice '{choice}' — defaulting to Claude Code.")
         return ["claude"]
-    if choice in ("2", "codex"):
-        return ["codex"]
-    if choice in ("3", "both"):
-        return ["claude", "codex"]
-    print(f"Unrecognized choice '{choice}' — defaulting to Claude Code.")
-    return ["claude"]
+    return clients
 
 
 def warn_on_empty_card_fields(card: dict[str, str]) -> list[str]:
@@ -290,9 +432,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--creds", metavar="PATH", help="credential card to read (default: resolved automatically)")
     parser.add_argument(
         "--client",
-        choices=("claude", "codex", "both"),
+        choices=(*_CLIENTS, "both", "all"),
         default=None,
-        help="which coding agent to register with (default: prompt interactively)",
+        help=(
+            "which coding agent to register with: claude, codex, vscode (GitHub Copilot in "
+            "VS Code), copilot (GitHub Copilot CLI), both (claude + codex) or all "
+            "(default: prompt interactively)"
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -443,7 +589,7 @@ def main() -> None:
     if args.client is None:
         clients = _prompt_for_clients()
     else:
-        clients = ["claude", "codex"] if args.client == "both" else [args.client]
+        clients = _parse_client_choice(args.client)
 
     project_root = get_project_root()
     card_path, card = load_card(args.creds, root=project_root)
@@ -456,18 +602,33 @@ def main() -> None:
     endpoint = card["F1_RTCE_MCP_ENDPOINT"]
     token = basic_token(card["F1_RTCE_API_KEY"], card["F1_RTCE_API_SECRET"])
 
-    results = []
+    registered = {}
     for client in clients:
         if client == "claude":
-            results.append(register_claude(endpoint, token, dry_run=args.dry_run))
+            registered[client] = register_claude(endpoint, token, dry_run=args.dry_run)
+        elif client == "codex":
+            registered[client] = write_codex_config(endpoint, token, _codex_config_path(), dry_run=args.dry_run)
+        elif client == "vscode":
+            registered[client] = register_vscode(endpoint, token, dry_run=args.dry_run)
         else:
-            results.append(write_codex_config(endpoint, token, _codex_config_path(), dry_run=args.dry_run))
+            registered[client] = register_copilot_cli(endpoint, token, dry_run=args.dry_run)
 
-    if not all(results):
+    if not args.dry_run:
+        if registered.get("claude"):
+            print("Restart Claude Code to pick the server up.")
+        if registered.get("copilot"):
+            print("Restart GitHub Copilot CLI to pick the server up.")
+        if registered.get("vscode"):
+            print(
+                f"In VS Code, run \"MCP: List Servers\", start '{_SERVER_NAME}' if it isn't running, "
+                "then use Copilot Chat in Agent mode."
+            )
+
+    # Always, even when every registration reported success: an agent can accept
+    # an entry and still not load it, and this is the way back.
+    print_manual_instructions(clients, endpoint, token)
+    if not all(registered.values()):
         sys.exit(1)
-
-    if "claude" in clients and not args.dry_run:
-        print("Restart Claude Code to pick the server up.")
 
 
 if __name__ == "__main__":

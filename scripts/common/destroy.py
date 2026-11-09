@@ -321,7 +321,8 @@ def _cleanup_mcp(root: Path) -> None:
     """Drop this project's MCP registrations; they point at a destroyed environment.
 
     Best-effort: a missing `claude` CLI or an absent registration is not an error.
-    Codex entries live in the user-global ~/.codex/config.toml and may serve other
+    Codex and GitHub Copilot entries are user-global (~/.codex/config.toml,
+    ~/.copilot/mcp-config.json, the VS Code user profile) and may serve other
     projects, so they are only mentioned, never edited.
     """
     env_file = root / MCP_ENV_FILE
@@ -337,6 +338,11 @@ def _cleanup_mcp(root: Path) -> None:
                 print(f"  Removed Claude Code MCP server '{name}'")
     if (Path.home() / ".codex" / "config.toml").exists():
         print(f"  Codex: remove {', '.join(MCP_SERVERS)} from ~/.codex/config.toml if you registered them.")
+    rtce = MCP_SERVERS[1]
+    if shutil.which("copilot"):
+        print(f"  GitHub Copilot CLI: run `copilot mcp remove {rtce}` if you registered it.")
+    if shutil.which("code"):
+        print(f'  VS Code: remove {rtce} via "MCP: Open User Configuration" if you registered it.')
 
 
 def _offer_credentials_cleanup(creds_file: Path, args: argparse.Namespace, still_deployed: bool) -> None:
