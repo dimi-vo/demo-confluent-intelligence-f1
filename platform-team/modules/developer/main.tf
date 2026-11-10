@@ -77,7 +77,7 @@ resource "confluent_flink_compute_pool" "main" {
 # evidence, so the pause is short. Every statement waits for it, directly or
 # through another statement (tests/developer_module.tftest.hcl).
 resource "time_sleep" "cluster_settle" {
-  create_duration = "30s"
+  create_duration = "60s"
 
   depends_on = [data.confluent_schema_registry_cluster.main]
 }

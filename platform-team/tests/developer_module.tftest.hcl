@@ -234,7 +234,9 @@ run "driver_race_history_waits_for_cluster" {
   }
 }
 
-run "llm_textgen_model_waits_for_cluster" {
+# The model goes last, after the seed, so it is never submitted alongside
+# another statement; it reaches the settle through the chain.
+run "llm_textgen_model_waits_for_seed" {
   command = plan
 
   module {
@@ -243,6 +245,11 @@ run "llm_textgen_model_waits_for_cluster" {
 
   plan_options {
     target = [confluent_flink_statement.llm_textgen_model]
+  }
+
+  assert {
+    condition     = startswith(confluent_flink_statement.seed_driver_race_history.statement, "INSERT INTO `driver_race_history`")
+    error_message = "llm_textgen_model should depend on seed_driver_race_history"
   }
 
   assert {

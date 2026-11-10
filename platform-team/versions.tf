@@ -4,7 +4,7 @@ terraform {
   required_providers {
     confluent = {
       source  = "confluentinc/confluent"
-      version = "= 2.92.0"
+      version = "= 2.94.0"
     }
     http = {
       source  = "hashicorp/http"

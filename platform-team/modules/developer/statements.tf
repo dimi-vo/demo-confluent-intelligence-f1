@@ -229,5 +229,5 @@ resource "confluent_flink_statement" "llm_textgen_model" {
     "sql.current-database" = confluent_kafka_cluster.main.display_name
   }
 
-  depends_on = [time_sleep.cluster_settle]
+  depends_on = [confluent_flink_statement.seed_driver_race_history]
 }
