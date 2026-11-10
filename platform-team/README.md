@@ -133,9 +133,11 @@ An empty `Usage` means 0.
 
 In the example, the organization has room for 28 more environments. 
 
-> ![IMPORTANT]Leave some headroom on `kafka.max_kafka_creation.per_day` in case you have to replace a stack on the same day.
-
-> ![IMPORTANT]Raise a quota through Confluent Support **if needed**.
+> ![IMPORTANT]
+>
+> Leave some headroom on `kafka.max_kafka_creation.per_day` in case you have to replace a stack on the same day.
+>
+> Raise a quota through Confluent Support **if needed**.
 
 ## 5. Check the region
 
