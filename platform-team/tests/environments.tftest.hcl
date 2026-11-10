@@ -70,33 +70,20 @@ run "creates_one_environment_per_developer" {
   }
 }
 
-run "validation_fills_in_each_developers_ids" {
-  # Set here, so a local terraform.tfvars can't change it.
-  variables {
-    region = "us-east-1"
-  }
-
-  # Same email order as the handout; the SQL names the table in full.
+run "validation_numbers_each_developers_link" {
+  # The heading once, then the developers numbered in the handout's order
+  # (uppercase first), each with a link to their driver_race_history topic.
   assert {
     condition = output.validation == join("\n", [
-      for email, name in {
-        "John.Doe@example.com"          = "John-Doe-${random_id.env_suffix["John.Doe@example.com"].hex}_env"
-        "jane.doe+envadmin@example.com" = "jane-doe-envadmin-${random_id.env_suffix["jane.doe+envadmin@example.com"].hex}_env"
-      } :
-      join("\n", [
-        "${email}: ${name} (env-mock01)",
-        "",
-        "  1. The five statements are COMPLETED:",
-        "     confluent flink statement list --environment env-mock01 --cloud aws --region us-east-1",
-        "",
-        "  2. The topics car_telemetry, race_standings and driver_race_history exist:",
-        "     confluent kafka topic list --environment env-mock01 --cluster lkc-mock01",
-        "",
-        "  3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool RIVER-RACING-DEMO-pool):",
-        "     SELECT COUNT(*) FROM `${name}`.`RIVER-RACING-DEMO-CLUSTER`.`driver_race_history`;",
-        "",
-      ])
+      "Check via the console that each topic exists and holds the expected data:",
+      "",
+      "1. John.Doe@example.com: John-Doe-${random_id.env_suffix["John.Doe@example.com"].hex}_env (env-mock01)",
+      "   https://confluent.cloud/environments/env-mock01/clusters/lkc-mock01/topics/driver_race_history/message-viewer?tab=schema",
+      "",
+      "2. jane.doe+envadmin@example.com: jane-doe-envadmin-${random_id.env_suffix["jane.doe+envadmin@example.com"].hex}_env (env-mock01)",
+      "   https://confluent.cloud/environments/env-mock01/clusters/lkc-mock01/topics/driver_race_history/message-viewer?tab=schema",
+      "",
     ])
-    error_message = "validation should print each developer's three checks with their environment ID, cluster ID and names filled in"
+    error_message = "validation should print the heading once, then each developer numbered with their environment and topic link"
   }
 }

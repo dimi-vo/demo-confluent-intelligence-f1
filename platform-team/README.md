@@ -280,52 +280,28 @@ Afterwards, `terraform plan` must again report `No changes.`
 
 ## 10. Validate the environments
 
-Print the checks, with every environment's IDs and names filled in:
+Print a link to each person's `driver_race_history` topic, numbered in the same order as the handout:
 
 ```bash
 terraform output -raw validation
 ```
 
-It prints three checks per person, in the same order as the handout:
-
 ```text
-jane.doe@example.com: jane-doe-7f3a_env (env-a1b2c3)
+Check via the console that each topic exists and holds the expected data:
 
-  1. The five statements are COMPLETED:
-     confluent flink statement list --environment env-a1b2c3 --cloud aws --region us-east-1
+1. jane.doe@example.com: jane-doe-7f3a_env (env-a1b2c3)
+   https://confluent.cloud/environments/env-a1b2c3/clusters/lkc-1x2y3z/topics/driver_race_history/message-viewer?tab=schema
 
-  2. The topics car_telemetry, race_standings and driver_race_history exist:
-     confluent kafka topic list --environment env-a1b2c3 --cluster lkc-1x2y3z
-
-  3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool RIVER-RACING-DEMO-pool):
-     SELECT COUNT(*) FROM `jane-doe-7f3a_env`.`RIVER-RACING-DEMO-CLUSTER`.`driver_race_history`;
-
-john.smith@example.com: john-smith-c21e_env (env-d4e5f6)
-
-  1. The five statements are COMPLETED:
-     confluent flink statement list --environment env-d4e5f6 --cloud aws --region us-east-1
-
-  2. The topics car_telemetry, race_standings and driver_race_history exist:
-     confluent kafka topic list --environment env-d4e5f6 --cluster lkc-4u5v6w
-
-  3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool RIVER-RACING-DEMO-pool):
-     SELECT COUNT(*) FROM `john-smith-c21e_env`.`RIVER-RACING-DEMO-CLUSTER`.`driver_race_history`;
+2. john.smith@example.com: john-smith-c21e_env (env-d4e5f6)
+   https://confluent.cloud/environments/env-d4e5f6/clusters/lkc-4u5v6w/topics/driver_race_history/message-viewer?tab=schema
 ```
 
-Run the three checks for each person, in order:
+Sign in to the Console as an OrganizationAdmin and open each link. It goes straight to that person's `driver_race_history` topic in the message viewer. The topic must exist, hold messages and have a registered schema. With many developers this takes a while, but you only do it once, the day before the workshop.
 
-**1. The five statements are `COMPLETED`.** Run the printed `confluent flink statement list`. It must show the five statements from [step 7](#7-create-the-instructors-environments), named `tf-…`, all `COMPLETED`. If one is `FAILED`, or missing, follow [If the apply stops](#if-the-apply-stops). If the seed (`INSERT INTO driver_race_history`) is still `RUNNING`, wait for it before check 3: until then the count is still rising.
+- **The topic doesn't exist:** its `CREATE TABLE` statement didn't complete. Follow [If the apply stops](#if-the-apply-stops).
+- **The topic is empty:** the seed didn't land. Rebuild the table as in [The `driver_race_history` seed](#the-driver_race_history-seed) and open the link again.
 
-**2. The three topics exist.** Run the printed `confluent kafka topic list`. Each source table's `CREATE TABLE` statement creates its Kafka topic, so the list must include `car_telemetry`, `race_standings` and `driver_race_history`. (`car_state` and `pit_decisions` aren't there yet: the developers create them in the labs.) If one is missing, its statement didn't complete: follow [If the apply stops](#if-the-apply-stops).
-
-**3. `driver_race_history` holds exactly 198 rows.** The Confluent CLI can't print a query's result, so this check runs in the Console. Open the [Flink SQL workspace](https://confluent.cloud/workspaces/) on the person's environment and its `RIVER-RACING-DEMO-pool` compute pool, and run the printed `SELECT`. It names the table in full, so the workspace's selected catalog and database don't matter.
-
-The count climbs for a few seconds, then settles. **It must settle on `198`.** Then stop the query: it's a streaming query, and keeps running in the developer's pool until you do.
-
-- **`396`:** the seed ran twice.
-- **Anything else, `0` included:** the seed didn't land.
-
-In both cases, rebuild the table as in [The `driver_race_history` seed](#the-driver_race_history-seed) and count again.
+You can't tell by eye if the seed ran twice (396 rows instead of 198). Each developer's deploy counts the rows exactly, and sends them to you if the count isn't 198.
 
 ## 11. Developer access
 
@@ -361,7 +337,7 @@ A developer who sees **`Confluent Cloud refused a new Global key`** already hold
 
 The 198 rows are one plain `INSERT`. Terraform returns as soon as it starts running, so **a clean apply doesn't prove the rows landed**, and a re-apply after the errors in [If the apply stops](#if-the-apply-stops) can occasionally insert them twice.
 
-**[Step 10](#10-validate-the-environments) is the check, and each developer's deploy repeats it.** The deploy counts the rows, carries on at 198, seeds an empty table itself, and on any other count stops with `driver_race_history holds N rows, expected 198` and sends the developer to you. To rebuild that developer's table, with the Confluent CLI signed in as an OrganizationAdmin and their environment ID from the [handout](#11-developer-access):
+**[Step 10](#10-validate-the-environments) is a quick look; each developer's deploy is the exact check.** The deploy counts the rows, carries on at 198, seeds an empty table itself, and on any other count stops with `driver_race_history holds N rows, expected 198` and sends the developer to you. To rebuild that developer's table, with the Confluent CLI signed in as an OrganizationAdmin and their environment ID from the [handout](#11-developer-access):
 
 ```bash
 confluent kafka cluster list --environment <env-id>    # their cluster ID
@@ -431,7 +407,7 @@ State is local by default (`terraform.tfstate` in this folder). To keep it somew
 | `providers.tf` | The Confluent provider, configured with your OrganizationAdmin Global key |
 | `variables.tf` | Your key and secret, `developer_emails` and the checks on it, `region`, `flink_max_cfu`, `csp_hosted_model` |
 | `main.tf` | The user lookups, the lookup of your key's owner, the name suffixes, and one `modules/developer` per email |
-| `outputs.tf` | The `handout` table, and the `validation` checks of [step 10](#10-validate-the-environments) |
+| `outputs.tf` | The `handout` table, and the `validation` links of [step 10](#10-validate-the-environments) |
 | `modules/developer/` | One developer's stack: environment, role binding, cluster, compute pool, and the tables, seed and model (`statements.tf`, `driver_race_history_seed.sql`) |
 | `terraform.tfvars.example` | A starting point for your `terraform.tfvars` |
 | `tests/` | Offline checks of the naming, the email list, the developer stack and the outputs (`terraform test`); every provider is mocked, so they never contact Confluent Cloud |

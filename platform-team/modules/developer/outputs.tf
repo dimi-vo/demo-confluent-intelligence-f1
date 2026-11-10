@@ -10,14 +10,6 @@ output "cluster_id" {
   value = confluent_kafka_cluster.main.id
 }
 
-output "cluster_name" {
-  value = confluent_kafka_cluster.main.display_name
-}
-
-output "compute_pool_name" {
-  value = confluent_flink_compute_pool.main.display_name
-}
-
 # A test can't reach resources inside a module, so the root's tests read the
 # statements' catalog and principal from here. The name is the provider's
 # auto-generated one, as listed in the Console.

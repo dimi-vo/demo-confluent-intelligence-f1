@@ -32,25 +32,24 @@ output "handout" {
   ])
 }
 
-# README step 10's checks, one block per developer with their IDs filled in;
-# print it with `terraform output -raw validation`. module.developer is a map,
-# so it iterates in email order, like the handout. The Confluent CLI can't print
-# a query's result, so the row count is SQL for the Console's Flink SQL
-# workspace, fully qualified so it doesn't depend on the selected catalog.
+# README step 10's check: a heading, then one numbered Console link per
+# developer to their driver_race_history topic, opened by hand. Print it with
+# `terraform output -raw validation`. keys() lists the emails in lexical order,
+# like the handout, and its index numbers them.
 output "validation" {
-  description = "The commands and SQL that check each developer's topics and seed, one block per developer"
-  value = join("\n", [
-    for email, dev in module.developer : <<-EOT
-      ${email}: ${dev.environment_name} (${dev.environment_id})
-
-        1. The five statements are COMPLETED:
-           confluent flink statement list --environment ${dev.environment_id} --cloud aws --region ${var.region}
-
-        2. The topics car_telemetry, race_standings and driver_race_history exist:
-           confluent kafka topic list --environment ${dev.environment_id} --cluster ${dev.cluster_id}
-
-        3. driver_race_history holds 198 rows (Flink SQL workspace, compute pool ${dev.compute_pool_name}):
-           SELECT COUNT(*) FROM `${dev.environment_name}`.`${dev.cluster_name}`.`driver_race_history`;
-    EOT
-  ])
+  description = "A numbered Console link per developer to their driver_race_history topic"
+  value = join("", concat(
+    ["Check via the console that each topic exists and holds the expected data:\n"],
+    [
+      for i, email in keys(module.developer) : format(
+        "\n%d. %s: %s (%s)\n   https://confluent.cloud/environments/%s/clusters/%s/topics/driver_race_history/message-viewer?tab=schema\n",
+        i + 1,
+        email,
+        module.developer[email].environment_name,
+        module.developer[email].environment_id,
+        module.developer[email].environment_id,
+        module.developer[email].cluster_id,
+      )
+    ],
+  ))
 }
