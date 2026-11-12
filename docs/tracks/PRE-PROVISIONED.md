@@ -1,11 +1,14 @@
 # Pre-provisioned workshop walkthrough
 
----
----
-THIS A LONG README, MAYBE YOU WANT TO GO TO [https://dimi-vo.github.io/demo-confluent-intelligence-f1/#welcome](https://dimi-vo.github.io/demo-confluent-intelligence-f1/#welcome) INSTEAD.
 
----
----
+⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️
+
+➡️ THIS A LONG README!
+
+➡️ MAYBE YOU WANT TO GO TO [https://dimi-vo.github.io/demo-confluent-intelligence-f1/#welcome](https://dimi-vo.github.io/demo-confluent-intelligence-f1/#welcome) INSTEAD?
+
+⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️
+
 
 ![F1 Pit Wall Confluent Intelligence architecture](../assets/architecture.png)
 
@@ -143,7 +146,7 @@ It writes them to your credential card, `runs/pre-provisioned/credentials/DEMO.e
 
 New keys can take a minute or two to become active, so expect a couple of short waits. Before it finishes, the deploy checks that `driver_race_history` holds its 198 rows.
 
-When it finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. It then offers to start the Pit Wall dashboard in the background. You won't need the dashboard until section 3, so you can answer **n**.
+When it finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. It then offers to start the Pit Wall dashboard in the background. You won't need the dashboard until section 4, so you can answer **n**.
 
 Running the deploy again reuses your credential card while its keys still work, so it creates nothing new.
 
@@ -262,7 +265,7 @@ where `finishing_pos` = 1;
 
 Your platform team set up the source tables `car_telemetry`, `race_standings` and `driver_race_history`.
 
-In this section, you create a `car_state` table that joins telemetry with race standings over 20-second tumbling windows, and uses Confluent's built-in `ML_DETECT_ANOMALIES` function to flag abnormal front-left tire temperatures. You build it step by step: a join (2.2), a window aggregation (2.3), anomaly detection (2.4), and finally the table itself (2.5).
+In this section, you create a `car_state` table that joins telemetry with race standings over 20-second tumbling windows, and uses Confluent's built-in `ML_DETECT_ANOMALIES` function to flag abnormal front-left tire temperatures. You build it step by step: a join (2.2), a window aggregation (2.3) and anomaly detection (2.4). Then you reset the race (2.5) and create the table itself (2.6). In sections 3 and 4, you create the strategy agent, and then restart the race and watch it unfold.
 
 ### 2.1 Start the race
 
@@ -646,11 +649,35 @@ timestamp,              actual_value, forecast_value, lower_bound, upper_bound, 
 - [OVER Aggregation Queries](https://docs.confluent.io/cloud/current/flink/reference/queries/over-aggregation.html)
 - [OVER aggregations](https://developer.confluent.io/courses/flink-sql/over-windows/) — Flink SQL course on Confluent Developer
 
-### 2.5 Put it all together: create `car_state`
+### 2.5 Reset the race
+
+The race you started in 2.1 has been running for a while. Let's start from a clean slate:
+
+1. Stop `f1-race` with Ctrl-C.
+2. Stop the Pit Wall dashboard if it's running: press Ctrl-C in its terminal, or, if the deploy started it in the background, run the `kill` command the deploy printed.
+3. Reset:
+
+    ```bash
+    uv run reset
+    ```
+
+    It stops your Flink statements and clears the race data from the source topics.
+
+Leave the race stopped for now. You create `car_state` in 2.6 and the strategy agent in [section 3](#3-create-a-strategy-using-streaming-agents), and then start the race again in [section 4](#4-start-the-race), so the lap 24 anomaly happens while you're watching.
+
+<details>
+<summary>🛠️ Troubleshooting</summary>
+
+- **`A local race simulator is still producing`.** `uv run reset` won't clear the topics while `f1-race` is running, because the race would fill them again straight away. Press Ctrl-C in the terminal where `f1-race` runs, then run the reset again.
+- **`uv run reset` asks you to sign in.** It uses your Confluent CLI session from [0.3](#03-explore-your-environment-from-the-cli). If that session has expired, it asks you to sign in; with SSO, press **Enter** at the email prompt and accept the single sign-on login.
+
+</details>
+
+### 2.6 Put it all together: create `car_state`
 
 **What you'll learn:** how `CREATE TABLE ... AS SELECT` (CTAS) turns a query into a statement that runs continuously and writes its results to a new table.
 
-Now combine the previous three steps into one statement that creates the `car_state` table. `car_state` holds one row per car (our team only has one car in this example) for every lap (one 20-second window).
+Now combine the join, the window aggregation and the anomaly detection from 2.2–2.4 into one statement that creates the `car_state` table. `car_state` holds one row per car (our team only has one car in this example) for every lap (one 20-second window).
 
 The table has these columns. The telemetry values are averages over the lap.
 
@@ -671,10 +698,6 @@ The table has these columns. The telemetry values are averages over the lap.
 - `tire_age_laps`: how many laps the current tires have done.
 
 The `CREATE TABLE` statement must also set two options in its `WITH` clause: `'changelog.mode' = '...'` and `'kafka.consumer.isolation-level' = 'read-uncommitted'`. Think about which mode `car_state` needs.
-
-> [!IMPORTANT]
->
-> Before you run the statement, reset the race: stop `f1-race` with Ctrl-C, stop the Pit Wall dashboard if it's running, and run `uv run reset`. Reset clears the topics, so `car_state` processes one clean race from lap 1.
 
 **Your task:** put together everything you've built so far to create the `car_state` table.
 
@@ -740,13 +763,13 @@ WHERE lap > 0;
 The `WITH` options shape the new table:
 
 - `'changelog.mode' = 'append'` makes `car_state` an insert-only stream.
-- `'kafka.consumer.isolation-level' = 'read-uncommitted'` lets statements that read `car_state`, such as `pit_decisions` in section 4, see each row as soon as it's written instead of waiting for its transaction to commit.
+- `'kafka.consumer.isolation-level' = 'read-uncommitted'` lets statements that read `car_state`, such as `pit_decisions` in section 3, see each row as soon as it's written instead of waiting for its transaction to commit.
 
 </details>
 
 > [!IMPORTANT]
 >
-> **Leave this statement running**, and wait until it shows **Running**. Then continue with [section 3](#3-start-the-race).
+> **Leave this statement running**, and wait until it shows **Running**. It stays empty until you start the race in [section 4](#4-start-the-race). Then continue with [section 3](#3-create-a-strategy-using-streaming-agents).
 
 **Learn more**
 
@@ -754,60 +777,7 @@ The `WITH` options shape the new table:
 - [The `kafka.consumer.isolation-level` option](https://docs.confluent.io/cloud/current/flink/reference/statements/create-table.html#kafka-consumer-isolation-level)
 - [Monitor and Manage Flink SQL Statements](https://docs.confluent.io/cloud/current/flink/operate-and-deploy/monitor-statements.html)
 
-## 3. Start the race
-
-With `car_state` running, start the race again and watch the car's state build up lap by lap.
-
-> [!NOTE]
->
-> If at any point the data looks wrong or your queries return nothing, for example after the race restarted, follow [Start from a clean slate](#start-from-a-clean-slate).
-
-### 3.1 Start the race and open the Pit Wall
-
-1. Start the Pit Wall dashboard, and leave it running:
-
-    ```bash
-    uv run f1-pitwall
-    ```
-
-2. In a second terminal, start the race, and leave it running:
-
-    ```bash
-    uv run f1-race
-    ```
-
-3. Open [localhost:8000](http://localhost:8000).
-
-The dashboard shows the Silverstone track map, the live leaderboard, and car #88's tire and fuel gauges. The **Anomaly Detection** panel unlocks as `car_state` emits rows, and the **AI Pit Strategist** panel unlocks once you create `pit_decisions` in section 4.
-
-![Pit Wall dashboard showing a nominal front-left tire temperature](../assets/self-service/pitwall-nominal.png)
-
-### 3.2 Watch `car_state` fill up
-
-**What you'll learn:** how `car_state` evolves lap by lap, and when the anomaly detector has enough history to flag a spike.
-
-`car_state` emits one row per 20-second window. After 12 windows (about 4 minutes), it has enough history to detect temperature anomalies on the front-left tire. At lap 24, the tire spikes to about 145°C and `anomaly_tire_temp_fl` becomes `true`.
-
-Verify that `car_state` is filling up:
-
-```sql
-SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_temp_fl, tire_temp_fl_c
-FROM `car_state`;
-```
-
-> [!IMPORTANT]
->
-> Stop the query when you're done. The `car_state` statement keeps running.
-
-<details>
-<summary>🛠️ Troubleshooting</summary>
-
-- **`car_state` is empty at first.** `car_state` emits one row per 20-second window, and `f1-race` aligns lap 1 to the next 20-second wall-clock boundary before starting. Make sure `car_state` is **Running** before starting `uv run f1-race`.
-- **No anomaly around lap 24.** `ML_DETECT_ANOMALIES` needs 12 windows of context (`minTrainingSize = 12`) before lap 24. If `car_state` was started mid-race after lap 12, reset and start `car_state` before `uv run f1-race`.
-
-</details>
-
-## 4. Create a strategy using Streaming Agents
+## 3. Create a strategy using Streaming Agents
 
 In this section, you deploy a Streaming Agent that uses the `car_state` information to define our strategy.
 
@@ -817,7 +787,7 @@ Our `pit_strategy_agent` evaluates the car's condition and the race context on e
 - `PIT SOON`
 - `PIT NOW`
 
-### 4.1 The model
+### 3.1 The model
 
 **What you'll learn:** which models your Flink statements can call for inference.
 
@@ -836,7 +806,7 @@ We'll use `llm_textgen_model`.
 - [Run External Model Inference](https://docs.confluent.io/cloud/current/ai/ai-model-inference.html)
 - [CREATE MODEL Statement](https://docs.confluent.io/cloud/current/flink/reference/statements/create-model.html)
 
-### 4.2 The agent
+### 3.2 The agent
 
 **What you'll learn:** how `CREATE AGENT` combines a model and a prompt into a Streaming Agent you can call from Flink SQL.
 
@@ -925,7 +895,7 @@ SHOW AGENTS;
 - [Streaming Agents with Confluent Intelligence](https://docs.confluent.io/cloud/current/ai/streaming-agents/overview.html)
 - [CREATE AGENT Statement](https://docs.confluent.io/cloud/current/flink/reference/statements/create-agent.html)
 
-### 4.3 Create the strategy table
+### 3.3 Create the strategy table
 
 **What you'll learn:** how `AI_RUN_AGENT` calls an agent for every row of a stream, and how to parse the agent's text answer into columns.
 
@@ -992,7 +962,7 @@ LATERAL TABLE(AI_RUN_AGENT(
 
 > [!IMPORTANT]
 >
-> **Leave this statement running.**
+> **Leave this statement running.** It stays empty until you start the race in [section 4](#4-start-the-race).
 
 **Learn more**
 
@@ -1000,11 +970,107 @@ LATERAL TABLE(AI_RUN_AGENT(
 - [Create and Run Streaming Agents](https://docs.confluent.io/cloud/current/ai/streaming-agents/create-and-run-streaming-agents.html)
 - [Debug Streaming Agents](https://docs.confluent.io/cloud/current/ai/streaming-agents/debug-streaming-agents.html)
 
-### 4.4 Watch the agent's decisions
+## 4. Start the race
+
+`car_state` and `pit_decisions` are running and waiting for data. Start the race and watch the car's state and the agent's decisions build up lap by lap.
+
+> [!NOTE]
+>
+> If at any point the data looks wrong or your queries return nothing, for example after the race restarted, follow [Start from a clean slate](#start-from-a-clean-slate).
+
+### 4.1 Start the race and open the Pit Wall
+
+1. Start the Pit Wall dashboard, and leave it running:
+
+    ```bash
+    uv run f1-pitwall
+    ```
+
+2. In a second terminal, start the race, and leave it running:
+
+    ```bash
+    uv run f1-race
+    ```
+
+3. Open [localhost:8000](http://localhost:8000).
+
+Lap 1 starts on the next 20-second wall-clock boundary, so it can take up to 20 seconds to appear.
+
+The dashboard shows the Silverstone track map, the live leaderboard, and car #88's tire and fuel gauges. The **Anomaly Detection** panel unlocks as `car_state` emits rows, and the **AI Pit Strategist** panel unlocks as `pit_decisions` emits rows.
+
+![Pit Wall dashboard showing a nominal front-left tire temperature](../assets/self-service/pitwall-nominal.png)
+
+### 4.2 Review `car_state`
+
+**What you'll learn:** how `car_state` fills up lap by lap, when the anomaly detector has enough history to flag a spike, and how to query the table your statement writes to.
+
+`car_state` gets one row per lap, every 20 seconds. After 12 windows (about 4 minutes), the detector has enough history to flag temperature anomalies on the front-left tire. At lap 24, the tire spikes to about 145°C and `anomaly_tire_temp_fl` becomes `true`.
+
+Run these queries while the race goes on. Leave each one running for a few laps to watch it update.
+
+**Follow the race lap by lap.** A new row appears every lap:
+
+```sql
+SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_temp_fl, tire_temp_fl_c
+FROM `car_state`;
+```
+
+**Watch the tires wear.** The longer a set of tires runs, the hotter it gets and the more pressure it loses:
+
+```sql
+SELECT lap, tire_compound, tire_age_laps,
+  tire_temp_fl_c, tire_temp_fr_c, tire_temp_rl_c, tire_temp_rr_c,
+  tire_pressure_fl_psi, tire_pressure_fr_psi, tire_pressure_rl_psi, tire_pressure_rr_psi
+FROM `car_state`;
+```
+
+Our car starts on `SOFT` tires and pits at the end of lap 24. From lap 25, it runs on fresh `MEDIUM` tires: `tire_age_laps` starts over, and the temperatures and pressures go back to their starting values.
+
+**Summarize each stint.** Aggregate `car_state` per tire compound:
+
+```sql
+SELECT tire_compound,
+  COUNT(*) AS laps,
+  MAX(tire_age_laps) AS max_tire_age_laps,
+  ROUND(MAX(tire_temp_fl_c), 1) AS max_tire_temp_fl_c
+FROM `car_state`
+GROUP BY tire_compound;
+```
+
+Unlike `car_state`, this result updates in place: each lap changes the `SOFT` row, and after the pit stop a `MEDIUM` row appears. At lap 24, the `SOFT` row's `max_tire_temp_fl_c` jumps to about 145.
+
+**Your task:** find the lap where the detector flagged the front-left tire.
+
+<details>
+<summary>✅ Solution</summary>
+
+```sql
+SELECT lap, tire_temp_fl_c, tire_compound, tire_age_laps, `position`
+FROM `car_state`
+WHERE anomaly_tire_temp_fl = true;
+```
+
+It returns nothing until lap 24, about 8 minutes into the race. Leave it running: the lap 24 row appears by itself once Flink has processed that lap, without you running the query again.
+
+</details>
+
+> [!IMPORTANT]
+>
+> Stop the queries when you're done. The `car_state` statement keeps running.
+
+<details>
+<summary>🛠️ Troubleshooting</summary>
+
+- **`car_state` is empty at first.** `f1-race` waits up to 20 seconds before lap 1, and Flink writes a lap's row only after the lap ends, so the first row can take a minute or so to appear.
+- **No anomaly at lap 24, or lap numbers start over at 1.** `car_state` needs one clean race from lap 1. The topics held more than one race when you created it, or the race looped after lap 60. Follow [Start from a clean slate](#start-from-a-clean-slate).
+
+</details>
+
+### 4.3 Watch the agent's decisions
 
 **What you'll learn:** how to read the agent's lap-by-lap recommendations, including its call on the lap 24 anomaly.
 
-Because the `pit_decisions` statement reads `car_state` from `earliest-offset`, it also processes the laps that have already arrived, so the Pit Wall shows the agent's decisions for the previous laps too.
+Every `car_state` row triggers one call to the agent, so `pit_decisions` follows `car_state` lap by lap. The Pit Wall's **AI Pit Strategist** panel fills in as the decisions arrive. The statement reads `car_state` from `earliest-offset`, so if you ever recreate `pit_decisions` in the middle of a race, it also processes the laps that have already arrived.
 
 Query `pit_decisions` to see the streaming recommendations:
 
@@ -1013,7 +1079,7 @@ SELECT lap, `position`, suggestion, condition_summary, reasoning
 FROM `pit_decisions`;
 ```
 
-Filter for the tire temperature anomaly to inspect the lap 24 pit call:
+Filter for the tire temperature anomaly to inspect the lap 24 pit call. It returns nothing until lap 24, about 8 minutes into the race:
 
 ```sql
 SELECT lap, `position`, tire_compound_current, tire_age_laps, anomaly_tire_temp_fl,
@@ -1199,7 +1265,7 @@ Fill in the first `<column>` with the recommended tire compound, and the second 
 <details>
 <summary>💡 Hint</summary>
 
-The column names are the aliases in the `CREATE TABLE pit_decisions` statement from 4.3. Look for the `AS ...` after the expressions that extract **Recommended Compound** and **Reasoning**.
+The column names are the aliases in the `CREATE TABLE pit_decisions` statement from 3.3. Look for the `AS ...` after the expressions that extract **Recommended Compound** and **Reasoning**.
 
 </details>
 
@@ -1235,7 +1301,7 @@ Use this when you want to erase the race history and repeat the workshop, or whe
 
     It stops your Flink statements, drops `car_state`, `pit_strategy_agent` and `pit_decisions`, and clears the race data from the source topics.
 
-4. If you had created `car_state`, recreate it ([2.5](#25-put-it-all-together-create-car_state)) and wait for it to show **Running**. Recreate `pit_strategy_agent` and `pit_decisions` (section 4) too if you had built them.
+4. If you had created `car_state`, recreate it ([2.6](#26-put-it-all-together-create-car_state)) and wait for it to show **Running**. Recreate `pit_strategy_agent` and `pit_decisions` (section 3) too if you had built them.
 
     Alternatively, run `uv run reset --with-labs` in step 3: it rebuilds `car_state`, `pit_strategy_agent` and `pit_decisions` for you.
 
@@ -1257,6 +1323,25 @@ Use this when you want to erase the race history and repeat the workshop, or whe
 <summary>🛠️ Troubleshooting</summary>
 
 - **`uv run reset` asks you to sign in.** It uses your Confluent CLI session from [0.3](#03-explore-your-environment-from-the-cli). If that session has expired, it asks you to sign in; with SSO, press **Enter** at the email prompt and accept the single sign-on login.
+- **The deploy fails to mint your keys when you run it again.** Start over with new keys:
+
+    1. Delete the keys the last deploy created:
+
+        ```bash
+        uv run destroy
+        ```
+
+    2. If `uv run destroy` fails, delete the keys yourself. Sign in to the [Confluent Cloud Console](https://confluent.cloud) and, under **API keys** → **My account**, delete your Global, Kafka and Schema Registry keys. Then delete the `runs/` folder in the repository root:
+
+        ```bash
+        rm -rf runs/
+        ```
+
+    3. Run the deploy again:
+
+        ```bash
+        uv run deploy --track pre-provisioned
+        ```
 
 </details>
 

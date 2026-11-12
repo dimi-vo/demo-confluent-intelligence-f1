@@ -249,6 +249,59 @@ ol.steps-list > li > p { margin-bottom: 8px; }
 .zoom.open { display: flex; }
 .zoom img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 
+/* Temporal join animation (2.2). Every class is tj-prefixed: the deck script treats each .card as a step, and the page already styles .tag, .code, .row and .step. */
+.tj { position: relative; margin: 24px 0 26px; }
+.tj-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: var(--midnight); box-shadow: 0 0 0 1px var(--border-strong); }
+/* The stage is a fixed 1920x1080 canvas that the script scales to the frame's width. Its palette comes from the page's tokens; --panel and --bar are redefined here for the stage only. */
+.tj-stage { --ground: var(--midnight); --main: var(--cyan); --second: #E8EEF5; --accent: #F2B33D; --display: var(--sans);
+  --grid: color-mix(in srgb, var(--second) 7%, transparent); --dim: color-mix(in srgb, var(--second) 64%, var(--ground)); --rail: color-mix(in srgb, var(--second) 22%, var(--ground));
+  --bar: color-mix(in srgb, var(--main) 28%, var(--ground)); --panel: color-mix(in srgb, var(--main) 9%, var(--ground)); --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0;
+  background: var(--ground); color: var(--second); font-family: var(--sans); line-height: normal; }
+.tj-stage .tj-scene { position: absolute; inset: 0; display: none; }
+.tj-stage .tj-scene.on { display: block; }
+.tj-stage .tj-ground { position: absolute; inset: 0; background: var(--ground); }
+.tj-stage .tj-air { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 0%, var(--panel), var(--ground) 70%); }
+.tj-stage .tj-art { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tj-stage .tj-cam { position: absolute; inset: 0; transform-origin: 960px 560px; }
+.tj-stage .tj-words { position: absolute; margin: 0; display: flex; flex-direction: column; gap: 20px; }
+.tj-stage .tj-words > * { margin: 0; }
+.tj-stage .tj-line { font-family: var(--display); font-size: 84px; line-height: 1.05; font-weight: 700; }
+.tj-stage .tj-lbl { font-family: var(--mono); font-size: 34px; line-height: 1.15; }
+.tj-stage .tj-lbl-sub { font-size: 28px; line-height: 1.2; color: var(--dim); }
+.tj-stage .tj-tick { position: absolute; margin: 0; font-family: var(--mono); font-size: 28px; color: var(--dim); transform: translateX(-50%); }
+.tj-stage .tj-chip { position: absolute; margin: 0; padding: 4px 16px; border-radius: 8px; background: var(--main); color: var(--ground); font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1.2; transform: translate(-50%, -50%); }
+.tj-stage .tj-tag { position: absolute; margin: 0; padding: 10px 20px; border-radius: 10px; background: var(--ground); border: 3px solid var(--accent); font-family: var(--mono); font-size: 32px; line-height: 1.2; }
+.tj-stage .tj-card { position: absolute; margin: 0; padding: 36px 40px; border-radius: 16px; background: var(--panel); border: 2px solid var(--rail); display: flex; flex-direction: column; gap: 12px; }
+.tj-stage .tj-code { font-family: var(--mono); font-size: 36px; line-height: 1.3; margin: 0; white-space: nowrap; } /* system monospace fonts differ in width: never wrap a SQL line */
+.tj-stage .tj-row { display: grid; grid-template-columns: 80px 1fr 80px; gap: 12px; padding: 10px 0; border-top: 2px solid var(--rail); font-family: var(--mono); font-size: 32px; line-height: 1.2; }
+.tj-stage .tj-row span:last-child, .tj-stage .tj-head span:last-child { text-align: right; }
+.tj-stage .tj-row span:last-child { color: var(--main); }
+.tj-stage .tj-head { display: grid; grid-template-columns: 80px 1fr 80px; gap: 12px; padding: 0 0 10px; font-size: 28px; color: var(--dim); }
+.tj-stage .tj-w { display: inline-block; white-space: pre; }
+/* Controls: the step tabs on their own row so the labels fit, Back / Replay / Next under them. */
+.tj-bar { display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; margin-top: 14px; }
+.tj-steps { grid-area: 1 / 1 / 2 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tj-steps li { margin: 0; }
+.tj-step { position: relative; display: block; width: 100%; height: 100%; min-height: 40px; padding: 6px 10px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--bar); color: var(--muted); font: 500 13px/1.3 var(--sans); text-align: left; cursor: pointer; }
+.tj-step:hover { border-color: var(--denim); }
+.tj-step .tj-fill { position: absolute; inset: 0; background: color-mix(in srgb, var(--cyan) 38%, var(--bar)); transform-origin: 0 50%; transform: scaleX(0); }
+.tj-step .tj-nm { position: relative; display: block; }
+.tj-step .tj-n { margin-right: 6px; font-variant-numeric: tabular-nums; }
+.tj-step[aria-current="step"] { border-color: var(--denim); color: var(--midnight); font-weight: 650; }
+.tj-step.seen .tj-fill { transform: scaleX(1); }
+.tj-btn { grid-row: 2; padding: 7px 16px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel); box-shadow: 0 3px 0 var(--border-strong); color: var(--denim); font: 600 14px var(--sans); cursor: pointer; transition: transform .08s ease, box-shadow .08s ease; }
+.tj-btn:hover:not(:disabled) { border-color: var(--denim); }
+.tj-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 var(--border-strong); }
+.tj-btn:disabled { opacity: .35; cursor: default; }
+.tj-btn.tj-primary { grid-column: 4; min-width: 7em; border-color: var(--denim); background: var(--denim); box-shadow: 0 3px 0 var(--midnight); color: #fff; }
+.tj-btn.tj-primary.ready { box-shadow: 0 3px 0 var(--midnight), 0 0 0 4px color-mix(in srgb, var(--cyan) 45%, transparent); }
+.tj-btn.tj-primary:active { box-shadow: 0 0 0 var(--midnight); }
+.tj-caption { margin-top: 14px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+.tj-caption p { margin: 0; }
+.tj-measure { position: absolute; left: 0; right: 0; visibility: hidden; pointer-events: none; } /* sizes the caption to its longest step, so the page below never jumps */
+@media (max-width: 520px) { .tj-step .tj-label, .tj-replay { display: none; } }
+
 @media (max-width: 1000px) {
   .stage { grid-template-columns: 1fr 1fr; grid-template-areas: "learn learn" "deck deck" "prev next"; gap: 0 16px; padding: 20px 14px 110px; }
   .arrow { position: static; margin-top: 16px; }
@@ -439,7 +492,7 @@ cd demo-confluent-intelligence-f1</code></pre>
     </ol>
     <p>It writes them to your credential card, <code>runs/pre-provisioned/credentials/DEMO.env</code>.</p>
     <p>New keys can take a minute or two to become active, so expect a couple of short waits. Before it finishes, the deploy checks that <code>driver_race_history</code> holds its 198 rows.</p>
-    <p>When it finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. It then offers to start the Pit Wall dashboard in the background. You won't need the dashboard until section 3, so you can answer <strong>n</strong>.</p>
+    <p>When it finishes, it prints a link to your Flink SQL workspace, your catalog and database, and the next steps. It then offers to start the Pit Wall dashboard in the background. You won't need the dashboard until section 4, so you can answer <strong>n</strong>.</p>
     <p>Running the deploy again reuses your credential card while its keys still work, so it creates nothing new.</p>
     <div class="callout important">
       <span class="label">Important</span>
@@ -569,7 +622,7 @@ where `finishing_pos` = 1;</code></pre>
     <div class="card-body">
       <div class="section-intro">
     <p class="lead">Your platform team set up the source tables <code>car_telemetry</code>, <code>race_standings</code> and <code>driver_race_history</code>.</p>
-    <p class="lead">In this section, you create a <code>car_state</code> table that joins telemetry with race standings over 20-second tumbling windows, and uses Confluent's built-in <code>ML_DETECT_ANOMALIES</code> function to flag abnormal front-left tire temperatures. You build it step by step: a join (2.2), a window aggregation (2.3), anomaly detection (2.4), and finally the table itself (2.5).</p>
+    <p class="lead">In this section, you create a <code>car_state</code> table that joins telemetry with race standings over 20-second tumbling windows, and uses Confluent's built-in <code>ML_DETECT_ANOMALIES</code> function to flag abnormal front-left tire temperatures. You build it step by step: a join (2.2), a window aggregation (2.3) and anomaly detection (2.4). Then you reset the race (2.5) and create the table itself (2.6). In sections 3 and 4, you create the strategy agent, and then restart the race and watch it unfold.</p>
       
       </div>
     <p>Start the race simulator, so there's a flow of data coming in:</p>
@@ -670,6 +723,17 @@ JOIN `race_standings`
  /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ 
  FOR SYSTEM_TIME AS OF t.event_time AS r 
  ON t.car_number = r.car_number</code></pre>
+      <p>Step through the animation to see how a temporal join gives each telemetry reading the version of the standings that was valid at its event time.</p>
+      <div class="tj" role="group" aria-label="Animation: how a temporal join works, in four steps">
+        <div class="tj-frame" role="img" aria-label="Animated diagram of the current step"><div class="tj-stage"></div></div>
+        <div class="tj-bar">
+          <ol class="tj-steps"></ol>
+          <button class="tj-btn tj-back" type="button">Back</button>
+          <button class="tj-btn tj-replay" type="button">Replay</button>
+          <button class="tj-btn tj-primary tj-next" type="button">Next</button>
+        </div>
+        <div class="tj-caption" aria-live="polite"></div>
+      </div>
       <p>This query relates each <code>car_telemetry</code> record to the most recent <code>race_standings</code> record for that car, as of the time of that reading (<code>t.event_time</code>). This is almost always what you really want. Compared to a regular inner join, a temporal join has a number of other advantages:</p>
       <ul>
         <li>The output stream is insert-only rather than updating, so you can apply any sort of further processing to it.</li>
@@ -902,13 +966,39 @@ FROM windowed</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-2-5" data-title="2.5 Put it all together: create car_state">
+  <article class="card" id="step-2-5" data-title="2.5 Reset the race">
+    <header class="card-intro">
+      <h2 class="intro-title">Reset the race</h2>
+    </header>
+    <div class="card-body">
+    <p>The race you started in 2.1 has been running for a while. Let's start from a clean slate:</p>
+    <ol class="steps-list">
+      <li><p>Stop <code>f1-race</code> with Ctrl-C.</p></li>
+      <li><p>Stop the Pit Wall dashboard if it's running: press Ctrl-C in its terminal, or, if the deploy started it in the background, run the <code>kill</code> command the deploy printed.</p></li>
+      <li>
+        <p>Reset:</p>
+        <pre data-lang="bash"><code>uv run reset</code></pre>
+        <p>It stops your Flink statements and clears the race data from the source topics.</p>
+      </li>
+    </ol>
+    <p>Leave the race stopped for now. You create <code>car_state</code> in 2.6 and the strategy agent in section 3, and then start the race again in section 4, so the lap 24 anomaly happens while you're watching.</p>
+    <details class="trouble">
+      <summary><svg class="i"><use href="#i-wrench"/></svg>Troubleshooting<svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <ul>
+        <li><strong><code>A local race simulator is still producing</code>.</strong> <code>uv run reset</code> won't clear the topics while <code>f1-race</code> is running, because the race would fill them again straight away. Press Ctrl-C in the terminal where <code>f1-race</code> runs, then run the reset again.</li>
+        <li><strong><code>uv run reset</code> asks you to sign in.</strong> It uses your Confluent CLI session from <a href="#step-0-3">0.3</a>. If that session has expired, it asks you to sign in; with SSO, press <strong>Enter</strong> at the email prompt and accept the single sign-on login.</li>
+      </ul>
+    </details>
+    </div>
+  </article>
+
+  <article class="card" id="step-2-6" data-title="2.6 Put it all together: create car_state">
     <header class="card-intro">
       <h2 class="intro-title">Put it all together: create <code>car_state</code></h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>CREATE TABLE ... AS SELECT</code> (CTAS) turns a query into a statement that runs continuously and writes its results to a new table.</p>
     </header>
     <div class="card-body">
-    <p>Now combine the previous three steps into one statement that creates the <code>car_state</code> table. <code>car_state</code> holds one row per car (our team only has one car in this example) for every lap (one 20-second window).</p>
+    <p>Now combine the join, the window aggregation and the anomaly detection from 2.2–2.4 into one statement that creates the <code>car_state</code> table. <code>car_state</code> holds one row per car (our team only has one car in this example) for every lap (one 20-second window).</p>
     <p>The table has these columns. The telemetry values are averages over the lap.</p>
     <ul>
       <li><code>car_number</code>: the car's number.</li>
@@ -928,10 +1018,6 @@ FROM windowed</code></pre>
       <li><code>tire_age_laps</code>: how many laps the current tires have done.</li>
     </ul>
     <p>The <code>CREATE TABLE</code> statement must also set two options in its <code>WITH</code> clause: <code>'changelog.mode' = '...'</code> and <code>'kafka.consumer.isolation-level' = 'read-uncommitted'</code>. Think about which mode <code>car_state</code> needs.</p>
-    <div class="callout important">
-      <span class="label">Important</span>
-      <p>Before you run the statement, reset the race: stop <code>f1-race</code> with Ctrl-C, stop the Pit Wall dashboard if it's running, and run <code>uv run reset</code>. Reset clears the topics, so <code>car_state</code> processes one clean race from lap 1.</p>
-    </div>
     <div class="task">
       <span class="label">Your task</span>
       <p>Put together everything you've built so far to create the <code>car_state</code> table.</p>
@@ -993,12 +1079,12 @@ WHERE lap &gt; 0;</code></pre>
       <p>The <code>WITH</code> options shape the new table:</p>
       <ul>
         <li><code>'changelog.mode' = 'append'</code> makes <code>car_state</code> an insert-only stream.</li>
-        <li><code>'kafka.consumer.isolation-level' = 'read-uncommitted'</code> lets statements that read <code>car_state</code>, such as <code>pit_decisions</code> in section 4, see each row as soon as it's written instead of waiting for its transaction to commit.</li>
+        <li><code>'kafka.consumer.isolation-level' = 'read-uncommitted'</code> lets statements that read <code>car_state</code>, such as <code>pit_decisions</code> in section 3, see each row as soon as it's written instead of waiting for its transaction to commit.</li>
       </ul>
     </div>
     <div class="callout important">
       <span class="label">Important</span>
-      <p><strong>Leave this statement running</strong>, and wait until it shows <strong>Running</strong>. Then continue with section 3.</p>
+      <p><strong>Leave this statement running</strong>, and wait until it shows <strong>Running</strong>. It stays empty until you start the race in section 4. Then continue with section 3.</p>
     </div>
     <div class="more">
       <span class="label">Learn more</span>
@@ -1012,67 +1098,10 @@ WHERE lap &gt; 0;</code></pre>
   </article>
 </section>
 
-<!-- ============================== 3. Start the race ============================== -->
-<section class="section" id="section-3" data-title="3. Start the race" data-eyebrow="Start the race">
+<!-- ============================== 3. Streaming Agents ============================== -->
+<section class="section" id="section-3" data-title="3. Create a strategy using Streaming Agents" data-eyebrow="Create a strategy using Streaming Agents">
 
-  <article class="card" id="step-3-1" data-title="3.1 Start the race and open the Pit Wall">
-    <header class="card-intro">
-      <h2 class="intro-title">Start the race and open the Pit Wall</h2>
-    </header>
-    <div class="card-body">
-      <div class="section-intro">
-    <p class="lead">With <code>car_state</code> running, start the race again and watch the car's state build up lap by lap.</p>
-    <div class="callout info">
-      <span class="label">Note</span>
-      <p>If at any point the data looks wrong or your queries return nothing, for example after the race restarted, follow <a href="#step-clean-slate">Start from a clean slate</a>.</p>
-    </div>
-      
-      </div>
-    <ol class="steps-list">
-      <li>
-        <p>Start the Pit Wall dashboard, and leave it running:</p>
-        <pre data-lang="bash"><code>uv run f1-pitwall</code></pre>
-      </li>
-      <li>
-        <p>In a second terminal, start the race, and leave it running:</p>
-        <pre data-lang="bash"><code>uv run f1-race</code></pre>
-      </li>
-      <li><p>Open <a href="http://localhost:8000">localhost:8000</a>.</p></li>
-    </ol>
-    <p>The dashboard shows the Silverstone track map, the live leaderboard, and car #88's tire and fuel gauges. The <strong>Anomaly Detection</strong> panel unlocks as <code>car_state</code> emits rows, and the <strong>AI Pit Strategist</strong> panel unlocks once you create <code>pit_decisions</code> in section 4.</p>
-    <figure><img src="assets/pitwall-nominal.png" alt="Pit Wall dashboard showing a nominal front-left tire temperature"></figure>
-    </div>
-  </article>
-
-  <article class="card" id="step-3-2" data-title="3.2 Watch car_state fill up">
-    <header class="card-intro">
-      <h2 class="intro-title">Watch <code>car_state</code> fill up</h2>
-      <p class="learn"><span class="label">What you'll learn</span>How <code>car_state</code> evolves lap by lap, and when the anomaly detector has enough history to flag a spike.</p>
-    </header>
-    <div class="card-body">
-    <p><code>car_state</code> emits one row per 20-second window. After 12 windows (about 4 minutes), it has enough history to detect temperature anomalies on the front-left tire. At lap 24, the tire spikes to about 145°C and <code>anomaly_tire_temp_fl</code> becomes <code>true</code>.</p>
-    <p>Verify that <code>car_state</code> is filling up:</p>
-    <pre data-lang="sql"><code>SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_temp_fl, tire_temp_fl_c
-FROM `car_state`;</code></pre>
-    <div class="callout important">
-      <span class="label">Important</span>
-      <p>Stop the query when you're done. The <code>car_state</code> statement keeps running.</p>
-    </div>
-    <details class="trouble">
-      <summary><svg class="i"><use href="#i-wrench"/></svg>Troubleshooting<svg class="i chev"><use href="#i-chev"/></svg></summary>
-      <ul>
-        <li><strong><code>car_state</code> is empty at first.</strong> <code>car_state</code> emits one row per 20-second window, and <code>f1-race</code> aligns lap 1 to the next 20-second wall-clock boundary before starting. Make sure <code>car_state</code> is <strong>Running</strong> before starting <code>uv run f1-race</code>.</li>
-        <li><strong>No anomaly around lap 24.</strong> <code>ML_DETECT_ANOMALIES</code> needs 12 windows of context (<code>minTrainingSize = 12</code>) before lap 24. If <code>car_state</code> was started mid-race after lap 12, reset and start <code>car_state</code> before <code>uv run f1-race</code>.</li>
-      </ul>
-    </details>
-    </div>
-  </article>
-</section>
-
-<!-- ============================== 4. Streaming Agents ============================== -->
-<section class="section" id="section-4" data-title="4. Create a strategy using Streaming Agents" data-eyebrow="Create a strategy using Streaming Agents">
-
-  <article class="card" id="step-4-1" data-title="4.1 The model">
+  <article class="card" id="step-3-1" data-title="3.1 The model">
     <header class="card-intro">
       <h2 class="intro-title">The model</h2>
       <p class="learn"><span class="label">What you'll learn</span>Which models your Flink statements can call for inference.</p>
@@ -1097,7 +1126,7 @@ FROM `car_state`;</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-4-2" data-title="4.2 The agent">
+  <article class="card" id="step-3-2" data-title="3.2 The agent">
     <header class="card-intro">
       <h2 class="intro-title">The agent</h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>CREATE AGENT</code> combines a model and a prompt into a Streaming Agent you can call from Flink SQL.</p>
@@ -1180,7 +1209,7 @@ WITH ('max_iterations' = '10');</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-4-3" data-title="4.3 Create the strategy table">
+  <article class="card" id="step-3-3" data-title="3.3 Create the strategy table">
     <header class="card-intro">
       <h2 class="intro-title">Create the strategy table</h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>AI_RUN_AGENT</code> calls an agent for every row of a stream, and how to parse the agent's text answer into columns.</p>
@@ -1239,7 +1268,7 @@ LATERAL TABLE(AI_RUN_AGENT(
     </div>
     <div class="callout important">
       <span class="label">Important</span>
-      <p><strong>Leave this statement running.</strong></p>
+      <p><strong>Leave this statement running.</strong> It stays empty until you start the race in section 4.</p>
     </div>
     <div class="more">
       <span class="label">Learn more</span>
@@ -1251,18 +1280,101 @@ LATERAL TABLE(AI_RUN_AGENT(
     </div>
     </div>
   </article>
+</section>
 
-  <article class="card" id="step-4-4" data-title="4.4 Watch the agent's decisions">
+<!-- ============================== 4. Start the race ============================== -->
+<section class="section" id="section-4" data-title="4. Start the race" data-eyebrow="Start the race">
+
+  <article class="card" id="step-4-1" data-title="4.1 Start the race and open the Pit Wall">
+    <header class="card-intro">
+      <h2 class="intro-title">Start the race and open the Pit Wall</h2>
+    </header>
+    <div class="card-body">
+      <div class="section-intro">
+    <p class="lead"><code>car_state</code> and <code>pit_decisions</code> are running and waiting for data. Start the race and watch the car's state and the agent's decisions build up lap by lap.</p>
+    <div class="callout info">
+      <span class="label">Note</span>
+      <p>If at any point the data looks wrong or your queries return nothing, for example after the race restarted, follow <a href="#step-clean-slate">Start from a clean slate</a>.</p>
+    </div>
+      
+      </div>
+    <ol class="steps-list">
+      <li>
+        <p>Start the Pit Wall dashboard, and leave it running:</p>
+        <pre data-lang="bash"><code>uv run f1-pitwall</code></pre>
+      </li>
+      <li>
+        <p>In a second terminal, start the race, and leave it running:</p>
+        <pre data-lang="bash"><code>uv run f1-race</code></pre>
+      </li>
+      <li><p>Open <a href="http://localhost:8000">localhost:8000</a>.</p></li>
+    </ol>
+    <p>Lap 1 starts on the next 20-second wall-clock boundary, so it can take up to 20 seconds to appear.</p>
+    <p>The dashboard shows the Silverstone track map, the live leaderboard, and car #88's tire and fuel gauges. The <strong>Anomaly Detection</strong> panel unlocks as <code>car_state</code> emits rows, and the <strong>AI Pit Strategist</strong> panel unlocks as <code>pit_decisions</code> emits rows.</p>
+    <figure><img src="assets/pitwall-nominal.png" alt="Pit Wall dashboard showing a nominal front-left tire temperature"></figure>
+    </div>
+  </article>
+
+  <article class="card" id="step-4-2" data-title="4.2 Review car_state">
+    <header class="card-intro">
+      <h2 class="intro-title">Review <code>car_state</code></h2>
+      <p class="learn"><span class="label">What you'll learn</span>How <code>car_state</code> fills up lap by lap, when the anomaly detector has enough history to flag a spike, and how to query the table your statement writes to.</p>
+    </header>
+    <div class="card-body">
+    <p><code>car_state</code> gets one row per lap, every 20 seconds. After 12 windows (about 4 minutes), the detector has enough history to flag temperature anomalies on the front-left tire. At lap 24, the tire spikes to about 145°C and <code>anomaly_tire_temp_fl</code> becomes <code>true</code>.</p>
+    <p>Run these queries while the race goes on. Leave each one running for a few laps to watch it update.</p>
+    <p><strong>Follow the race lap by lap.</strong> A new row appears every lap:</p>
+    <pre data-lang="sql"><code>SELECT car_number, lap, `position`, tire_compound, tire_age_laps, anomaly_tire_temp_fl, tire_temp_fl_c
+FROM `car_state`;</code></pre>
+    <p><strong>Watch the tires wear.</strong> The longer a set of tires runs, the hotter it gets and the more pressure it loses:</p>
+    <pre data-lang="sql"><code>SELECT lap, tire_compound, tire_age_laps,
+  tire_temp_fl_c, tire_temp_fr_c, tire_temp_rl_c, tire_temp_rr_c,
+  tire_pressure_fl_psi, tire_pressure_fr_psi, tire_pressure_rl_psi, tire_pressure_rr_psi
+FROM `car_state`;</code></pre>
+    <p>Our car starts on <code>SOFT</code> tires and pits at the end of lap 24. From lap 25, it runs on fresh <code>MEDIUM</code> tires: <code>tire_age_laps</code> starts over, and the temperatures and pressures go back to their starting values.</p>
+    <p><strong>Summarize each stint.</strong> Aggregate <code>car_state</code> per tire compound:</p>
+    <pre data-lang="sql"><code>SELECT tire_compound,
+  COUNT(*) AS laps,
+  MAX(tire_age_laps) AS max_tire_age_laps,
+  ROUND(MAX(tire_temp_fl_c), 1) AS max_tire_temp_fl_c
+FROM `car_state`
+GROUP BY tire_compound;</code></pre>
+    <p>Unlike <code>car_state</code>, this result updates in place: each lap changes the <code>SOFT</code> row, and after the pit stop a <code>MEDIUM</code> row appears. At lap 24, the <code>SOFT</code> row's <code>max_tire_temp_fl_c</code> jumps to about 145.</p>
+    <div class="task">
+      <span class="label">Your task</span>
+      <p>Find the lap where the detector flagged the front-left tire.</p>
+    </div>
+    <div class="reveal" data-kind="solution" data-label="solution">
+      <pre data-lang="sql"><code>SELECT lap, tire_temp_fl_c, tire_compound, tire_age_laps, `position`
+FROM `car_state`
+WHERE anomaly_tire_temp_fl = true;</code></pre>
+      <p>It returns nothing until lap 24, about 8 minutes into the race. Leave it running: the lap 24 row appears by itself once Flink has processed that lap, without you running the query again.</p>
+    </div>
+    <div class="callout important">
+      <span class="label">Important</span>
+      <p>Stop the queries when you're done. The <code>car_state</code> statement keeps running.</p>
+    </div>
+    <details class="trouble">
+      <summary><svg class="i"><use href="#i-wrench"/></svg>Troubleshooting<svg class="i chev"><use href="#i-chev"/></svg></summary>
+      <ul>
+        <li><strong><code>car_state</code> is empty at first.</strong> <code>f1-race</code> waits up to 20 seconds before lap 1, and Flink writes a lap's row only after the lap ends, so the first row can take a minute or so to appear.</li>
+        <li><strong>No anomaly at lap 24, or lap numbers start over at 1.</strong> <code>car_state</code> needs one clean race from lap 1. The topics held more than one race when you created it, or the race looped after lap 60. Follow <a href="#step-clean-slate">Start from a clean slate</a>.</li>
+      </ul>
+    </details>
+    </div>
+  </article>
+
+  <article class="card" id="step-4-3" data-title="4.3 Watch the agent's decisions">
     <header class="card-intro">
       <h2 class="intro-title">Watch the agent's decisions</h2>
       <p class="learn"><span class="label">What you'll learn</span>How to read the agent's lap-by-lap recommendations, including its call on the lap 24 anomaly.</p>
     </header>
     <div class="card-body">
-    <p>Because the <code>pit_decisions</code> statement reads <code>car_state</code> from <code>earliest-offset</code>, it also processes the laps that have already arrived, so the Pit Wall shows the agent's decisions for the previous laps too.</p>
+    <p>Every <code>car_state</code> row triggers one call to the agent, so <code>pit_decisions</code> follows <code>car_state</code> lap by lap. The Pit Wall's <strong>AI Pit Strategist</strong> panel fills in as the decisions arrive. The statement reads <code>car_state</code> from <code>earliest-offset</code>, so if you ever recreate <code>pit_decisions</code> in the middle of a race, it also processes the laps that have already arrived.</p>
     <p>Query <code>pit_decisions</code> to see the streaming recommendations:</p>
     <pre data-lang="sql"><code>SELECT lap, `position`, suggestion, condition_summary, reasoning
 FROM `pit_decisions`;</code></pre>
-    <p>Filter for the tire temperature anomaly to inspect the lap 24 pit call:</p>
+    <p>Filter for the tire temperature anomaly to inspect the lap 24 pit call. It returns nothing until lap 24, about 8 minutes into the race:</p>
     <pre data-lang="sql"><code>SELECT lap, `position`, tire_compound_current, tire_age_laps, anomaly_tire_temp_fl,
         suggestion, recommended_tire_compound, recommended_stint_laps, reasoning
 FROM `pit_decisions`
@@ -1434,7 +1546,7 @@ OUTPUT
     <pre data-lang="sql"><code>SELECT lap, &lt;column&gt;, &lt;column&gt; FROM pit_decisions WHERE lap = 24 LIMIT 1</code></pre>
     <p>Fill in the first <code>&lt;column&gt;</code> with the recommended tire compound, and the second with the agent's reasoning for that call.</p>
     <div class="reveal" data-kind="hint" data-label="hint">
-      <p>The column names are the aliases in the <code>CREATE TABLE pit_decisions</code> statement from 4.3. Look for the <code>AS ...</code> after the expressions that extract <strong>Recommended Compound</strong> and <strong>Reasoning</strong>.</p>
+      <p>The column names are the aliases in the <code>CREATE TABLE pit_decisions</code> statement from 3.3. Look for the <code>AS ...</code> after the expressions that extract <strong>Recommended Compound</strong> and <strong>Reasoning</strong>.</p>
     </div>
     <div class="reveal" data-kind="solution" data-label="solution">
       <pre data-lang="sql"><code>SELECT lap, recommended_tire_compound, reasoning FROM pit_decisions WHERE lap = 24 LIMIT 1</code></pre>
@@ -1472,7 +1584,7 @@ OUTPUT
         <p>It stops your Flink statements, drops <code>car_state</code>, <code>pit_strategy_agent</code> and <code>pit_decisions</code>, and clears the race data from the source topics.</p>
       </li>
       <li>
-        <p>If you had created <code>car_state</code>, recreate it (<a href="#step-2-5">2.5</a>) and wait for it to show <strong>Running</strong>. Recreate <code>pit_strategy_agent</code> and <code>pit_decisions</code> (section 4) too if you had built them.</p>
+        <p>If you had created <code>car_state</code>, recreate it (<a href="#step-2-6">2.6</a>) and wait for it to show <strong>Running</strong>. Recreate <code>pit_strategy_agent</code> and <code>pit_decisions</code> (section 3) too if you had built them.</p>
         <p>Alternatively, run <code>uv run reset --with-labs</code> in step 3: it rebuilds <code>car_state</code>, <code>pit_strategy_agent</code> and <code>pit_decisions</code> for you.</p>
       </li>
       <li>
@@ -1489,6 +1601,7 @@ OUTPUT
       <summary><svg class="i"><use href="#i-wrench"/></svg>Troubleshooting<svg class="i chev"><use href="#i-chev"/></svg></summary>
       <ul>
         <li><strong><code>uv run reset</code> asks you to sign in.</strong> It uses your Confluent CLI session from <a href="#step-0-3">0.3</a>. If that session has expired, it asks you to sign in; with SSO, press <strong>Enter</strong> at the email prompt and accept the single sign-on login.</li>
+        <li><strong>The deploy fails to mint your keys when you run it again.</strong> Start over with new keys. Run <code>uv run destroy</code>. If that fails, delete the keys yourself: sign in to the <a href="https://confluent.cloud">Confluent Cloud Console</a> and, under <strong>API keys</strong> → <strong>My account</strong>, delete your Global, Kafka and Schema Registry keys, then delete the <code>runs/</code> folder in the repository root (<code>rm -rf runs/</code>). Then run <code>uv run deploy --track pre-provisioned</code> again.</li>
       </ul>
     </details>
     </div>
@@ -1846,6 +1959,277 @@ OUTPUT
   show(decodeURIComponent(location.hash.slice(1)) || state.last || "welcome");
   if (!location.hash) history.replaceState(null, "", "#" + current.id);
 
+})();
+</script>
+<script>
+// Temporal join animation (2.2): a four-step player drawn on a 1920x1080 stage that is scaled to the card's width.
+// Standalone code, so it shares nothing with the deck script above except the page's CSS tokens.
+(() => {
+  const widget = document.querySelector(".tj");
+  if (!widget) return;
+
+  // ---------- easing and time helpers ----------
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const seg = (t, a, b) => clamp01((t - a) / (b - a));
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const eo = (x) => 1 - Math.pow(1 - x, 3);
+  const eio = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const eob = (x, s) => { s = s || 1.4; const y = x - 1; return 1 + (s + 1) * y * y * y + s * y * y; };
+  const h = (html) => { const tp = document.createElement("template"); tp.innerHTML = html.trim(); return tp.content.firstElementChild; };
+  const all = (el, s) => Array.from(el.querySelectorAll(s));
+  const splitWords = (el) => {
+    const parts = el.textContent.split(" ");
+    el.textContent = "";
+    el._w = parts.map((w, i) => { const s = document.createElement("span"); s.className = "tj-w"; s.textContent = w + (i < parts.length - 1 ? " " : ""); el.appendChild(s); return s; });
+  };
+  const wordsIn = (el, t, t0) => {
+    el._w.forEach((s, i) => { const p = eo(seg(t, t0 + i * 0.11, t0 + i * 0.11 + 0.5)); s.style.opacity = p; s.style.transform = "translateX(" + ((1 - p) * 30).toFixed(1) + "px)"; });
+  };
+
+  // ---------- the shared board: two event-time tracks for car 7 ----------
+  const READS = [1, 3, 5, 7, 9, 11];
+  const VERS = [{ p: "P3", a: 0, b: 4 }, { p: "P2", a: 4, b: 8.5 }, { p: "P1", a: 8.5, b: 12 }];
+  const TICKS = ["12:00:00", "12:00:02", "12:00:04", "12:00:06", "12:00:08", "12:00:10", "12:00:12"];
+  const x = (s) => 540 + s * 103;
+
+  function board(id, extra) {
+    let svg = '<svg class="tj-art" viewBox="0 0 1920 1080"><defs><pattern id="' + id + '-grid" x="540" y="0" width="103" height="1080" patternUnits="userSpaceOnUse"><path d="M1 0 V1080" style="stroke:var(--grid);stroke-width:2"/></pattern></defs>';
+    svg += '<g class="tj-sheet"><rect x="540" y="330" width="1240" height="490" fill="url(#' + id + '-grid)"/>' +
+      '<path d="M540 846 H1792" style="stroke:var(--dim);stroke-width:3"/><path d="M1792 834 L1814 846 L1792 858 Z" style="fill:var(--dim)"/>';
+    for (let i = 0; i <= 12; i++) svg += '<path d="M' + x(i) + ' 846 V' + (i % 2 ? 836 : 828) + '" style="stroke:var(--dim);stroke-width:3"/>';
+    svg += "</g>";
+    svg += '<g class="tj-rail-t"><rect x="540" y="416" width="1240" height="8" rx="4" style="fill:var(--rail)"/></g>';
+    svg += '<g class="tj-rail-b"><rect x="540" y="716" width="1240" height="8" rx="4" style="fill:var(--rail)"/></g>';
+    svg += '<g class="tj-vers">' + VERS.map((v) => '<g class="tj-ver"><rect class="tj-vbar" x="' + x(v.a) + '" y="694" width="' + (x(v.b) - x(v.a) - 8) + '" height="52" rx="8" style="fill:var(--bar);stroke:var(--main);stroke-width:3"/><rect x="' + x(v.a) + '" y="686" width="8" height="68" rx="3" style="fill:var(--main)"/></g>').join("") + "</g>";
+    svg += (extra || "");
+    svg += '<g class="tj-reads">' + READS.map((s) => '<g transform="translate(' + x(s) + ' 420)"><g class="tj-read"><path d="M0 -16 V-60" style="stroke:var(--accent);stroke-width:3;opacity:.45"/><circle r="26" style="fill:var(--glow)"/><circle r="14" style="fill:var(--accent)"/></g></g>').join("") + "</g></svg>";
+    let html = '<div class="tj-words tj-lab" style="left:140px;top:376px;width:360px;gap:4px"><p class="tj-lbl">car_telemetry</p><p class="tj-lbl-sub">append-only</p></div>' +
+      '<div class="tj-words tj-lab" style="left:140px;top:676px;width:360px;gap:4px"><p class="tj-lbl">race_standings</p><p class="tj-lbl-sub">upsert by car_number</p></div>';
+    html += TICKS.map((s, i) => '<p class="tj-tick" style="left:' + x(i * 2) + 'px;top:870px">' + s + "</p>").join("");
+    html += VERS.map((v) => '<p class="tj-chip" style="left:' + (x(v.a) + 56) + 'px;top:720px">' + v.p + "</p>").join("");
+    return '<div class="tj-air"></div><div class="tj-cam">' + svg + html + "</div>";
+  }
+
+  // ---------- the four steps ----------
+  const STEPS = [
+    {
+      name: "Two streams", done: 3.2,
+      caption: "<p><code>car_telemetry</code> is append-only: every sensor reading is a new row and nothing is ever updated. <code>race_standings</code> is an upsert table keyed by <code>car_number</code>, so each new record replaces the previous one for that car.</p>",
+      build(root) {
+        root.append(h('<div class="tj-ground">' + board("tj-s1", "") + '<div class="tj-words" style="left:140px;top:110px;width:1640px"><p class="tj-line">Two streams, one join</p></div></div>'));
+        this.cam = root.querySelector(".tj-cam"); this.line = root.querySelector(".tj-line"); splitWords(this.line);
+        this.sheet = root.querySelector(".tj-sheet");
+        this.rails = [root.querySelector(".tj-rail-t"), root.querySelector(".tj-rail-b")];
+        this.rails.forEach((r) => { r.style.transformOrigin = "540px 0px"; });
+        this.vers = root.querySelector(".tj-vers"); this.chips = all(root, ".tj-chip"); this.labs = all(root, ".tj-lab"); this.reads = all(root, ".tj-read");
+      },
+      render(t) {
+        this.cam.style.transform = "scale(" + lerp(1, 1.02, eio(seg(t, 0, 5))).toFixed(4) + ")";
+        wordsIn(this.line, t, 0);
+        this.sheet.style.opacity = eo(seg(t, 0, 0.8));
+        this.rails.forEach((r, i) => { r.style.transform = "scaleX(" + eo(seg(t, 0.1 + i * 0.3, 1.2 + i * 0.3)).toFixed(4) + ")"; });
+        this.labs.forEach((l, i) => { const p = eo(seg(t, 0.3 + i * 0.3, 0.9 + i * 0.3)); l.style.opacity = p; l.style.transform = "translateX(" + lerp(-28, 0, p).toFixed(1) + "px)"; });
+        this.vers.style.opacity = 0; this.chips.forEach((c) => { c.style.opacity = 0; });
+        this.reads.forEach((g, i) => {
+          const at = 1.0 + i * 0.35, p = seg(t, at, at + 0.45);
+          const s = p <= 0 ? 0.001 : eob(p, 1.7) * (1 + 0.03 * Math.sin(t * 2.1 + i));
+          g.setAttribute("transform", "translate(0 " + lerp(-60, 0, eo(p)).toFixed(1) + ") scale(" + s.toFixed(3) + ")");
+          g.style.opacity = eo(seg(t, at, at + 0.2));
+        });
+      },
+    },
+    {
+      name: "Versions", done: 3.4,
+      caption: "<p>Each standings update for car 7 opens a new version and closes the one before it. Because <code>race_standings</code> has a primary key, Flink can keep these versions and look back at what was true at any moment in event time.</p>",
+      build(root) {
+        root.append(h('<div class="tj-ground">' + board("tj-s2", "") + '<div class="tj-words" style="left:140px;top:110px;width:1640px"><p class="tj-line">Each standings update replaces the last</p></div></div>'));
+        this.cam = root.querySelector(".tj-cam"); this.line = root.querySelector(".tj-line"); splitWords(this.line);
+        this.vers = all(root, ".tj-ver"); this.bars = all(root, ".tj-vbar"); this.chips = all(root, ".tj-chip"); this.reads = all(root, ".tj-read");
+        this.A = [0.4, 1.6, 2.8];
+      },
+      render(t) {
+        this.cam.style.transform = "scale(" + lerp(1.02, 1.035, eio(seg(t, 0, 5.5))).toFixed(4) + ")";
+        wordsIn(this.line, t, 0.15);
+        this.reads.forEach((g, i) => { g.setAttribute("transform", "scale(" + (1 + 0.03 * Math.sin(t * 2.1 + i)).toFixed(3) + ")"); g.style.opacity = lerp(1, 0.6, eo(seg(t, 0, 0.6))); });
+        VERS.forEach((v, i) => {
+          const at = this.A[i], p = eo(seg(t, at, at + 0.5));
+          const x0 = x(v.a), openW = x(12) - x0 - 8, closedW = x(v.b) - x0 - 8;
+          const next = this.A[i + 1];
+          const shut = next === undefined ? 0 : eio(seg(t, next, next + 0.45));
+          this.bars[i].setAttribute("width", Math.max(1, lerp(openW * p, closedW, shut)).toFixed(1));
+          this.vers[i].style.opacity = eo(seg(t, at - 0.05, at + 0.15));
+          this.vers[i].setAttribute("transform", "translate(0 " + lerp(-26, 0, eo(seg(t, at, at + 0.35))).toFixed(1) + ")");
+          const c = seg(t, at + 0.1, at + 0.5);
+          this.chips[i].style.opacity = eo(seg(t, at + 0.1, at + 0.25));
+          this.chips[i].style.transform = "translate(-50%,-50%) scale(" + (c <= 0 ? 0.2 : eob(c, 1.6)).toFixed(3) + ")";
+        });
+      },
+    },
+    {
+      name: "As of event time", done: 5.5,
+      caption: "<p><code>FOR SYSTEM_TIME AS OF t.event_time</code> joins each reading to the standings that were valid at that reading’s event time. The reading at 12:00:07 gets P2, even though P1 is the newest version. The reading at 12:00:11 gets P1.</p>",
+      build(root) {
+        const x7 = x(7), x11 = x(11);
+        const drop = (n, xx) => '<g><circle class="tj-ring' + n + '" cx="' + xx + '" cy="420" r="26" style="fill:none;stroke:var(--accent);stroke-width:4"/>' +
+          '<path class="tj-dash' + n + '" d="M' + xx + ' 446 V446" style="fill:none;stroke:var(--accent);stroke-width:4;stroke-dasharray:12 10"/>' +
+          '<path class="tj-hit' + n + '" d="M' + xx + ' 704 l16 16 l-16 16 l-16 -16 Z" style="fill:var(--accent);stroke:var(--ground);stroke-width:3"/></g>';
+        root.append(h('<div class="tj-ground">' + board("tj-s3", drop(1, x7) + drop(2, x11)) + '<div class="tj-words" style="left:140px;top:96px;width:1640px"><p class="tj-line">Each reading takes the version valid at its event_time</p></div></div>'));
+        const cam = root.querySelector(".tj-cam");
+        cam.append(h('<p class="tj-tag" style="left:' + (x7 + 30) + 'px;top:496px">12:00:07 → P2</p>'));
+        cam.append(h('<p class="tj-tag" style="right:' + (1920 - x11 + 30) + 'px;top:580px">12:00:11 → P1</p>'));
+        this.cam = cam; this.line = root.querySelector(".tj-line"); splitWords(this.line);
+        this.xs = [x7, x11];
+        this.vers = all(root, ".tj-ver"); this.chips = all(root, ".tj-chip"); this.reads = all(root, ".tj-read");
+        this.rings = [root.querySelector(".tj-ring1"), root.querySelector(".tj-ring2")];
+        this.dashes = [root.querySelector(".tj-dash1"), root.querySelector(".tj-dash2")];
+        this.hits = [root.querySelector(".tj-hit1"), root.querySelector(".tj-hit2")];
+        this.tags = all(root, ".tj-tag");
+      },
+      render(t) {
+        this.cam.style.transform = "scale(" + lerp(1.035, 1.075, eio(seg(t, 0, 7.5))).toFixed(4) + ")";
+        wordsIn(this.line, t, 0.1);
+        const go = [0.9, 3.9], pick = [3, 5];
+        this.reads.forEach((g, i) => {
+          const on = i === pick[0] ? seg(t, go[0], go[0] + 0.3) : i === pick[1] ? seg(t, go[1], go[1] + 0.3) : 0;
+          g.setAttribute("transform", "scale(" + (1 + 0.03 * Math.sin(t * 2.1 + i) + 0.25 * eo(on)).toFixed(3) + ")");
+          g.style.opacity = lerp(0.6, 1, eo(on));
+        });
+        go.forEach((a, n) => {
+          const ring = seg(t, a, a + 0.7);
+          this.rings[n].setAttribute("r", lerp(26, 70, eo(ring)).toFixed(1));
+          this.rings[n].style.opacity = ring <= 0 ? 0 : 1 - ring;
+          const d = eio(seg(t, a + 0.25, a + 0.95));
+          this.dashes[n].setAttribute("d", "M" + this.xs[n] + " 446 V" + lerp(446, 700, d).toFixed(1));
+          this.dashes[n].style.strokeDashoffset = (-t * 18).toFixed(1);
+          this.dashes[n].style.opacity = d > 0 ? 1 : 0;
+          const hh = seg(t, a + 0.9, a + 1.3);
+          this.hits[n].style.opacity = eo(seg(t, a + 0.9, a + 1.05));
+          this.hits[n].style.transformOrigin = this.xs[n] + "px 720px";
+          this.hits[n].style.transform = "scale(" + (hh <= 0 ? 0.2 : eob(hh, 1.8)).toFixed(3) + ")";
+          const g = eo(seg(t, a + 1.1, a + 1.6));
+          this.tags[n].style.opacity = g;
+          this.tags[n].style.transform = "translateY(" + lerp(16, 0, g).toFixed(1) + "px)";
+        });
+        const dimA = eo(seg(t, 1.9, 2.4)), backP1 = eo(seg(t, 4.9, 5.3));
+        const op = [lerp(1, 0.35, dimA), 1, lerp(lerp(1, 0.35, dimA), 1, backP1)];
+        this.vers.forEach((v, i) => { v.style.opacity = op[i]; this.chips[i].style.opacity = op[i]; });
+      },
+    },
+    {
+      name: "Insert-only output", done: 5.1,
+      caption: "<p>The result is insert-only and keeps its watermarks, so you can window it or process it further. Past telemetry readings are never stored in state. Two requirements: the versioned table needs a primary key, and that key must appear in the join condition (<code>t.car_number = r.car_number</code>).</p>",
+      build(root) {
+        const rows = [["7", "12:00:01", "P3"], ["7", "12:00:03", "P3"], ["7", "12:00:05", "P2"], ["7", "12:00:07", "P2"], ["7", "12:00:09", "P1"], ["7", "12:00:11", "P1"]];
+        root.append(h('<div class="tj-ground"><div class="tj-air"></div><div class="tj-cam">' +
+          '<div class="tj-words" style="left:140px;top:96px;width:1000px"><p class="tj-line">The temporal join</p></div>' +
+          '<div class="tj-card tj-code-card" style="left:140px;top:250px;width:960px">' +
+            '<p class="tj-code tj-c">FROM car_telemetry t</p><p class="tj-code tj-c">JOIN race_standings</p>' +
+            '<div class="tj-c" style="align-self:flex-start"><p class="tj-code" style="color:var(--accent)">FOR SYSTEM_TIME AS OF t.event_time AS r</p><div class="tj-under" style="height:5px;border-radius:3px;background:var(--accent);transform-origin:0 0"></div></div>' +
+            '<p class="tj-code tj-c">ON t.car_number = r.car_number</p>' +
+            '<p class="tj-code tj-c" style="color:var(--dim);margin-top:18px">-- no past readings kept in state</p></div>' +
+          '<div class="tj-card tj-table-card" style="left:1180px;top:250px;width:520px;gap:0">' +
+            '<p class="tj-lbl-sub" style="margin:0 0 14px">enriched readings, insert-only</p>' +
+            '<div class="tj-head"><span>car</span><span>event_time</span><span>pos</span></div>' +
+            rows.map((r) => '<div class="tj-row">' + r.map((c) => "<span>" + c + "</span>").join("") + "</div>").join("") + "</div>" +
+          "</div></div>"));
+        this.cam = root.querySelector(".tj-cam"); this.line = root.querySelector(".tj-line"); splitWords(this.line);
+        this.code = root.querySelector(".tj-code-card"); this.lines = all(root, ".tj-c"); this.under = root.querySelector(".tj-under");
+        this.table = root.querySelector(".tj-table-card"); this.rows = all(root, ".tj-row");
+      },
+      render(t) {
+        this.cam.style.transform = "scale(" + lerp(1, 1.025, eio(seg(t, 0, 7))).toFixed(4) + ")";
+        wordsIn(this.line, t, 0.05);
+        const c = eo(seg(t, 0, 0.5));
+        this.code.style.opacity = c; this.code.style.transform = "translateY(" + lerp(40, 0, c).toFixed(1) + "px)";
+        this.lines.forEach((l, i) => { const at = i === 4 ? 4.6 : 0.2 + i * 0.2, p = eo(seg(t, at, at + 0.45)); l.style.opacity = p; l.style.transform = "translateX(" + lerp(28, 0, p).toFixed(1) + "px)"; });
+        this.under.style.transform = "scaleX(" + eio(seg(t, 1.0, 1.8)).toFixed(4) + ")";
+        const tb = eo(seg(t, 0.4, 0.9));
+        this.table.style.opacity = tb; this.table.style.transform = "translateY(" + lerp(40, 0, tb).toFixed(1) + "px)";
+        this.rows.forEach((r, i) => { const at = 1.4 + i * 0.5, p = seg(t, at, at + 0.4); r.style.opacity = eo(seg(t, at, at + 0.2)); r.style.transform = "translateY(" + lerp(-22, 0, p <= 0 ? 0 : eob(p, 1.5)).toFixed(1) + "px)"; });
+      },
+    },
+  ];
+
+  // ---------- build the stage and the controls ----------
+  const stage = widget.querySelector(".tj-stage"), frame = widget.querySelector(".tj-frame");
+  const stepsEl = widget.querySelector(".tj-steps"), caption = widget.querySelector(".tj-caption");
+  const backBtn = widget.querySelector(".tj-back"), nextBtn = widget.querySelector(".tj-next"), replayBtn = widget.querySelector(".tj-replay");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  STEPS.forEach((s, i) => {
+    s.root = document.createElement("div"); s.root.className = "tj-scene"; stage.appendChild(s.root); s.build(s.root);
+    const li = document.createElement("li");
+    li.innerHTML = '<button class="tj-step" type="button"><span class="tj-fill"></span><span class="tj-nm"><span class="tj-n">' + (i + 1) + '</span><span class="tj-label">' + s.name + "</span></span></button>";
+    s.btn = li.firstChild; s.fill = s.btn.querySelector(".tj-fill");
+    s.btn.setAttribute("aria-label", "Step " + (i + 1) + ": " + s.name);
+    s.btn.addEventListener("click", () => go(i, i < cur));
+    stepsEl.appendChild(li);
+  });
+
+  // The caption is as tall as the longest step's, so the page below stays put as the steps change. An off-screen copy does the measuring, so the live region isn't rewritten.
+  const meter = caption.cloneNode(false);
+  meter.removeAttribute("aria-live"); meter.setAttribute("aria-hidden", "true"); meter.classList.add("tj-measure");
+  caption.after(meter);
+  const fitCaption = () => {
+    let tallest = 0;
+    STEPS.forEach((s) => { meter.innerHTML = s.caption; tallest = Math.max(tallest, meter.offsetHeight); });
+    caption.style.minHeight = tallest + "px";
+  };
+  const fit = () => { stage.style.transform = "scale(" + (frame.clientWidth / 1920) + ")"; fitCaption(); };
+  new ResizeObserver(fit).observe(frame); fit();
+
+  // Time only runs while the animation is on screen: the card is hidden until its step opens, and the first step should play when the reader gets here, not when the page loads.
+  let cur = 0, elapsed = 0, last = 0, visible = false, running = false;
+  function go(i, settled) {
+    if (i < 0 || i >= STEPS.length) return;
+    cur = i;
+    STEPS.forEach((s, j) => {
+      s.root.classList.toggle("on", j === i);
+      if (j === i) s.btn.setAttribute("aria-current", "step"); else s.btn.removeAttribute("aria-current");
+      s.btn.classList.toggle("seen", j < i); s.fill.style.transform = "";
+    });
+    elapsed = (settled || reduce.matches) ? STEPS[i].done : 0;
+    backBtn.disabled = i === 0;
+    nextBtn.textContent = i === STEPS.length - 1 ? "Start over" : "Next";
+    caption.innerHTML = STEPS[i].caption;
+    frame.setAttribute("aria-label", "Step " + (i + 1) + " of " + STEPS.length + ": " + STEPS[i].name);
+  }
+
+  backBtn.addEventListener("click", () => go(cur - 1, true));
+  nextBtn.addEventListener("click", () => (cur === STEPS.length - 1 ? go(0) : go(cur + 1)));
+  replayBtn.addEventListener("click", () => go(cur));
+  // ← and → step through the animation while focus is inside it. At the first and last step they are left alone, so the guide's own ← / → still move between cards.
+  widget.addEventListener("keydown", (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key === "ArrowRight" && cur < STEPS.length - 1) go(cur + 1);
+    else if (e.key === "ArrowLeft" && cur > 0) go(cur - 1, true);
+    else return;
+    e.preventDefault(); e.stopPropagation();
+  });
+
+  function frameLoop(now) {
+    if (!visible) { running = false; return; }
+    const s = STEPS[cur];
+    if (!reduce.matches) elapsed += Math.max(0, Math.min((now - last) / 1000, 0.25)); // capped, so a background tab doesn't skip ahead
+    last = now;
+    const t = reduce.matches ? s.done : elapsed;
+    s.render(t);
+    const p = clamp01(t / s.done);
+    s.fill.style.transform = "scaleX(" + p.toFixed(3) + ")";
+    nextBtn.classList.toggle("ready", p >= 1);
+    requestAnimationFrame(frameLoop);
+  }
+  function play() {
+    if (!visible || running) return;
+    running = true; last = performance.now();
+    requestAnimationFrame(frameLoop);
+  }
+
+  go(0);
+  STEPS[0].render(0); // the empty first frame, until the animation scrolls into view
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; play(); }, { threshold: 0.3 }).observe(frame);
+  } else { visible = true; play(); }
 })();
 </script>
 </body>
