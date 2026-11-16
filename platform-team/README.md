@@ -192,12 +192,12 @@ rm terraform.tfplan
 3. One role binding for the user
 4. One Standard cluster
 5. One Flink compute pool
-6. A 30-second pause
-7. Flink statement: create the `car_telemetry` table
-8. Flink statement: create the `race_standings` table
-9. Flink statement: create the `driver_race_history` table
-10. Flink statement: seed `driver_race_history` with its 198 rows
-11. Flink statement: create the `llm_textgen_model` model
+6. A 60-second pause
+7. Flink statement: create the `llm_textgen_model` model
+8. Flink statement: create the `car_telemetry` table
+9. Flink statement: create the `race_standings` table
+10. Flink statement: create the `driver_race_history` table
+11. Flink statement: seed `driver_race_history` with its 198 rows
 
 It fails before creating anything if:
 
@@ -366,13 +366,34 @@ Two more things about the seed:
 ## 12. Tear down
 
 1. **Each developer runs `uv run destroy`.** It deletes the three API keys their deploy minted, Global key included, and their local credential card. It leaves the environment and everything in it to you.
-2. **You run, from this folder:**
+2. **You create a destroy plan and check it before anything is deleted.** From this folder:
 
     ```bash
-    terraform destroy
+    terraform state list
+    terraform state list | grep confluent_environment
+    terraform plan -destroy -out=destroy.tfplan
+    terraform show destroy.tfplan | grep -A3 confluent_environment
     ```
 
-    It lists everything it will delete and asks you to type `yes`: the statements, compute pools, clusters, role bindings and environments this module created. `confluent environment list` no longer shows them afterwards.
+    Terraform deletes only what is in its state, by ID, so these three commands show you the most it can delete. Check that:
+
+    - **`terraform state list`** shows one environment per developer, and no others.
+    - **`terraform plan -destroy`** ends with `Plan: 0 to add, 0 to change, N to destroy.`, where **N is 11 per developer**: the same 11 resources as in [step 7](#7-create-the-instructors-environments).
+    - **`terraform show`** prints each environment's `display_name` and `id`. They must be exactly the `<name>-xxxx_env` environments this module created, and nothing else. Compare the IDs with `confluent environment list`: an environment from another project, in the same organization, must not appear.
+
+    The plan lists only the resources Terraform created. A developer's own topics, schemas and Flink statements aren't listed, but they go with their cluster, compute pool and environment.
+
+    If anything in the plan isn't what you expect, don't apply it: run `rm destroy.tfplan` and find out why first.
+3. **Once the plan is what you expect, apply it:**
+
+    ```bash
+    terraform apply destroy.tfplan
+    rm destroy.tfplan
+    ```
+
+    It deletes exactly what the plan lists, and doesn't ask for confirmation: the check in step 2 is the only one. If the state changes between the plan and the apply, Terraform refuses the plan as stale; create it again. Afterwards, `confluent environment list` no longer shows the developers' environments, and `terraform state list` prints nothing.
+
+    **`rm destroy.tfplan`:** the saved plan contains your API secret in plain text.
 
 No extra step is needed when developers' own Flink statements are still running in their pools: in our testing, `terraform destroy` removed the compute pool, cluster and environment with a developer's statement still running. We're re-confirming this with the workshop's full set of lab statements.
 
