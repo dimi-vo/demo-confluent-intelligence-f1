@@ -65,7 +65,7 @@ The Confluent CLI has no reliable winget package. Download the latest `confluent
 Clone the workshop repository, and move into it:
 
 ```bash
-git clone https://github.com/confluentinc/demo-confluent-intelligence-f1.git
+git clone https://github.com/dimi-vo/demo-confluent-intelligence-f1.git
 cd demo-confluent-intelligence-f1
 ```
 
