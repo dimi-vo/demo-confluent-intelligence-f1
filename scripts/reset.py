@@ -498,6 +498,8 @@ def kafka_admin(tf: dict):
     """
     from confluent_kafka.admin import AdminClient
 
+    from datagen.tls import kafka_ssl_config
+
     return AdminClient(
         {
             "bootstrap.servers": tf["cluster_bootstrap"].split("://", 1)[-1],
@@ -505,6 +507,7 @@ def kafka_admin(tf: dict):
             "sasl.mechanisms": "PLAIN",
             "sasl.username": tf["kafka_api_key"],
             "sasl.password": tf["kafka_api_secret"],
+            **kafka_ssl_config(),
         }
     )
 
