@@ -29,6 +29,7 @@ from datagen import config
 from datagen.drivers import GRID
 from datagen.race_script import RaceState
 from datagen.telemetry import ANOMALY_LAP, generate_telemetry
+from datagen.tls import kafka_ssl_config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -116,6 +117,7 @@ def _create_kafka_producer():
             "sasl.mechanisms": "PLAIN",
             "sasl.username": config.KAFKA_API_KEY,
             "sasl.password": config.KAFKA_API_SECRET,
+            **kafka_ssl_config(),
         }
     )
 

@@ -41,6 +41,7 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 
+from datagen.tls import kafka_ssl_config
 from scripts.pitwall.state import RaceState
 
 logger = logging.getLogger("f1-pitwall.consumer")
@@ -182,6 +183,7 @@ def _build_consumer(creds: dict[str, str], error_cb=None) -> Consumer:
             "auto.offset.reset": "earliest",
             "isolation.level": "read_uncommitted",
             "log_level": 0,
+            **kafka_ssl_config(),
         }
     except KeyError as e:
         raise SystemExit(f"Credential file is missing {e}.\n  {CARD_REMEDIATION}") from e
