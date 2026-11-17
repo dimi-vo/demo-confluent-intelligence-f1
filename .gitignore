@@ -6,7 +6,7 @@
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
-terraform.tfplan
+*.tfplan
 terraform.tfvars.backup
 terraform/providers-aws.tf
 terraform/providers-azure.tf
