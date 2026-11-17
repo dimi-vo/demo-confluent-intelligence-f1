@@ -138,7 +138,7 @@ uv run deploy --track pre-provisioned
 
 It creates three API keys for your account:
 
-1. A **Global API key**. The deploy uses it to create the other two keys, and the workshop tools use it for Flink and the Real-Time Context Engine.
+1. A **Global API key**. The deploy uses it to create the other two keys, and the workshop tools use it for Flink and Lightning Tables.
 2. A **Kafka API key**, which lets the race simulator and the Pit Wall dashboard read and write your topics.
 3. A **Schema Registry API key**, which lets them read and register your topics' Avro schemas.
 
@@ -1101,63 +1101,75 @@ WHERE anomaly_tire_temp_fl = true;
 
 </details>
 
-## 5. Expose `car_telemetry` to AI agents with Real-Time Context Engine
+## 5. Expose `car_telemetry` to AI agents with Lightning Tables
 
-Real-Time Context Engine (RTCE) exposes a Kafka topic as an MCP tool, so any MCP-compatible AI agent can query the live stream.
+A Lightning Table makes the data in an Apache Kafka® topic available for low-latency SQL queries. You enable a Lightning Table for a topic, and then you query it with SQL from the Confluent Cloud Console, an HTTP API, a Model Context Protocol (MCP) client, the Confluent CLI, or a Java Database Connectivity (JDBC) client.
 
-### 5.1 Enable RTCE on `car_telemetry`
+First, we are going to see how our agent can query the contents of a topic through MCP.
 
-**What you'll learn:** how to make a topic available to AI agents through the Real-Time Context Engine.
+### 5.1 Enable a Lightning Table on `car_telemetry`
 
-You enable RTCE **per topic in the Console**. Under your environment's cluster, open **[Topics](https://confluent.cloud/go/topics) → `car_telemetry`**, open the **Real-Time Context Engine** panel, and click **Enable** (or **Turn on**). Once it's enabled, the **Topics** list shows Real-Time Context Engine **On**:
+**What you'll learn:** how to make a topic available to AI agents with a Lightning Table.
 
-![Topics list with the Real-Time Context Engine column](../assets/self-service/rtce-topics-list.png)
+You enable a Lightning Table **per topic in the Console**:
 
-The panel displays the enablement details (environment, cluster, cloud and region) that an MCP client uses to reach it:
+1. Under your environment's cluster, choose **Topics** in the navigation menu.
+2. You may have to scroll the table to the right to see the **Lightning Tables** column. Click **+ Enable** for the `car_telemetry` topic.
+3. Confirm the dialog and wait for the Lightning Table to be provisioned.
 
-![Real-Time Context Engine enabled for car_telemetry](../assets/self-service/rtce-enabled.png)
+Setup takes a few minutes. When it finishes, a dialog confirms the Lightning Table is enabled, with **SQL**, **API** and **MCP** tabs for querying it.
 
-You can enable RTCE on `car_state` and `pit_decisions` the same way. You'll need them in [section 6](#6-create-a-social-media-agent) and [section 7](#7-analyze-race-data-with-lightning-queries).
+👀 New screenshots needed: the old ones showed the Real-Time Context Engine column and panel on the Topics page, so they were removed.
+
+You can enable a Lightning Table on `car_state` and `pit_decisions` the same way. You'll need them in [section 6](#6-create-a-social-media-agent) and [section 7](#7-analyze-race-data-with-lightning-queries).
 
 **Learn more**
 
-- [Real-Time Context Engine](https://docs.confluent.io/cloud/current/ai/real-time-context-engine/overview.html)
+- [Lightning Tables](https://docs.confluent.io/cloud/current/lightning-tables/overview.html)
+- [Get started with Lightning Tables](https://docs.confluent.io/cloud/current/lightning-tables/get-started.html)
 
 ### 5.2 Connect your coding agent
 
-Point your coding agent at RTCE in one command:
+The Real-Time Context Engine (RTCE) is the MCP interface to Lightning Tables in Confluent Intelligence. Your coding agent connects to it as an MCP server, then queries the most current data of every topic that has a Lightning Table.
+
+Point your coding agent at the Real-Time Context Engine in one command:
 
 ```bash
 uv run setup-rtce
 ```
 
-It asks which coding agent you use (Claude Code, Codex CLI, GitHub Copilot in VS Code or GitHub Copilot CLI) and registers RTCE as an MCP server with it, using the `F1_RTCE_MCP_ENDPOINT`, `F1_RTCE_API_KEY`, and `F1_RTCE_API_SECRET` fields on your credential card. The RTCE key on your card is the Global key your deploy created, so `uv run setup-rtce` doesn't ask for another one.
+It asks which coding agent you use (Claude Code, Codex CLI, GitHub Copilot in VS Code or GitHub Copilot CLI) and registers the Real-Time Context Engine with it as an MCP server named `real-time-context-engine`, using the `F1_RTCE_MCP_ENDPOINT`, `F1_RTCE_API_KEY`, and `F1_RTCE_API_SECRET` fields on your credential card. The key in those fields is the Global key your deploy created, so `uv run setup-rtce` doesn't ask for another one.
 
 Restart your coding agent.
 
+**Learn more**
+
+- [Real-Time Context Engine in Confluent Cloud](https://docs.confluent.io/cloud/current/ai/real-time-context-engine/overview.html#rtce-in-ccloud)
+- [Query a Lightning Table with MCP](https://docs.confluent.io/cloud/current/lightning-tables/query/mcp.html)
+
 ### 5.3 Ask questions in plain English
 
-**What you'll learn:** how an AI agent answers questions about a live stream by calling the Real-Time Context Engine.
+**What you'll learn:** how an AI agent answers questions about a live stream by querying a Lightning Table.
 
 Ask your coding agent:
 
 ```text
-What topics do I have access to in the Real-Time Context Engine?
+What Lightning Tables do I have access to?
 ```
 
-![Claude listing the topics enabled in the Real-Time Context Engine](../assets/hosted/rtce-listtopics.png)
+![Claude listing the topics that have a Lightning Table](../assets/hosted/rtce-listtopics.png)
 
 ```text
 How has the engine temperature been trending over the last few laps?
 ```
 
-![Claude answering how the engine temperature has trended over the last few laps by calling the Real-Time Context Engine](../assets/self-service/rtce-engine-trend.png)
+![Claude answering how the engine temperature has trended over the last few laps by querying a Lightning Table](../assets/self-service/rtce-engine-trend.png)
 
 ```text
 What's the front-left tire temperature on car 88 right now?
 ```
 
-![Claude answering the front-left tire temperature question by calling the Real-Time Context Engine](../assets/hosted/rtce-cartemp.png)
+![Claude answering the front-left tire temperature question by querying a Lightning Table](../assets/hosted/rtce-cartemp.png)
 
 ```text
 At what lap in the race does the engine temperature peak?
@@ -1169,19 +1181,19 @@ What is the front right tire temperature at lap 30?
 
 ## 6. Create a social media agent
 
-In this section, you switch roles and join River Racing's social media team. Your coding agent already reads the live race data through RTCE. Now you use it to write social media posts.
+In this section, you switch roles and join River Racing's social media team. Your coding agent already reads the live race data through Lightning Tables. Now you use it to write social media posts.
 
 ### 6.1 Draft a post from live race data
 
-**What you'll learn:** how to ground an AI agent's output in live race data through the Real-Time Context Engine.
+**What you'll learn:** how to ground an AI agent's output in live race data through Lightning Tables.
 
 > [!NOTE]
 >
-> Give your persona prompt and post requests to the coding agent you connected to RTCE in 5.2, for example Claude Code, Codex CLI or GitHub Copilot. That agent has the Real-Time Context Engine tools, so it can query the live topics. Another chatbot can't.
+> Give your persona prompt and post requests to the coding agent you connected in 5.2, for example Claude Code, Codex CLI or GitHub Copilot. That agent has the Real-Time Context Engine tools, so it can query the live topics. Another chatbot can't.
 
 **Your task:**
 
-1. Enable RTCE on the `car_state` and `pit_decisions` topics, the same way you enabled `car_telemetry` in 5.1.
+1. Enable a Lightning Table on the `car_state` and `pit_decisions` topics, the same way you did for `car_telemetry` in 5.1.
 2. Write a persona prompt that tells your agent how to write engaging social media posts for River Racing.
 3. Ask your agent to draft a post from the live race data.
 
@@ -1234,19 +1246,19 @@ To check the result, look at the transcript: your agent should call `queryData` 
 <details>
 <summary>🛠️ Troubleshooting</summary>
 
-- **The agent says the feed is quiet.** The race may not be running yet, or RTCE isn't enabled on one of the two topics.
+- **The agent says the feed is quiet.** The race may not be running yet, or one of the two topics has no Lightning Table yet.
 
 </details>
 
 ## 7. Analyze race data with Lightning Queries
 
-Lightning Queries run SQL against an RTCE-enabled topic over a low-latency REST API.
+Lightning Queries run SQL against a Lightning Table over a low-latency REST API.
 
 ### 7.1 Query `pit_decisions` with SQL over REST
 
 **What you'll learn:** how Lightning Tables and Lightning Queries make real-time context queryable with SQL.
 
-Print a ready-to-run query against `car_telemetry`, which you enabled in 5.1:
+Print a ready-to-run query against `car_telemetry`, whose Lightning Table you enabled in 5.1:
 
 ```bash
 uv run setup-rtce --lightning
@@ -1254,7 +1266,7 @@ uv run setup-rtce --lightning
 
 Copy the printed `curl` command into your terminal and run it. It returns the 10 most recent telemetry rows. You can edit the SQL in its `query` field to filter for car 88 or select other columns.
 
-**Your task:** make sure RTCE is enabled on `pit_decisions` (you did this in 6.1). Then edit the `query` in the `curl` command to find out which tire compound the agent recommended on lap 24, and why:
+**Your task:** make sure `pit_decisions` has a Lightning Table (you enabled it in 6.1). Then edit the `query` in the `curl` command to find out which tire compound the agent recommended on lap 24, and why:
 
 ```sql
 SELECT lap, <column>, <column> FROM pit_decisions WHERE lap = 24 LIMIT 1

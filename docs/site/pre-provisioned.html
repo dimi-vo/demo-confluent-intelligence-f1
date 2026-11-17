@@ -486,7 +486,7 @@ cd demo-confluent-intelligence-f1</code></pre>
     <pre data-lang="bash"><code>uv run deploy --track pre-provisioned</code></pre>
     <p>It creates three API keys for your account:</p>
     <ol>
-      <li>A <strong>Global API key</strong>. The deploy uses it to create the other two keys, and the workshop tools use it for Flink and the Real-Time Context Engine.</li>
+      <li>A <strong>Global API key</strong>. The deploy uses it to create the other two keys, and the workshop tools use it for Flink and Lightning Tables.</li>
       <li>A <strong>Kafka API key</strong>, which lets the race simulator and the Pit Wall dashboard read and write your topics.</li>
       <li>A <strong>Schema Registry API key</strong>, which lets them read and register your topics' Avro schemas.</li>
     </ol>
@@ -1394,28 +1394,34 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
   </article>
 </section>
 
-<!-- ============================== 5. RTCE ============================== -->
-<section class="section" id="section-5" data-title="5. Expose car_telemetry to AI agents" data-eyebrow="Expose car_telemetry to AI agents with Real-Time Context Engine">
+<!-- ============================== 5. Lightning Tables ============================== -->
+<section class="section" id="section-5" data-title="5. Expose car_telemetry to AI agents" data-eyebrow="Expose car_telemetry to AI agents with Lightning Tables">
 
-  <article class="card" id="step-5-1" data-title="5.1 Enable RTCE on car_telemetry">
+  <article class="card" id="step-5-1" data-title="5.1 Enable a Lightning Table on car_telemetry">
     <header class="card-intro">
-      <h2 class="intro-title">Enable RTCE on <code>car_telemetry</code></h2>
-      <p class="learn"><span class="label">What you'll learn</span>How to make a topic available to AI agents through the Real-Time Context Engine.</p>
+      <h2 class="intro-title">Enable a Lightning Table on <code>car_telemetry</code></h2>
+      <p class="learn"><span class="label">What you'll learn</span>How to make a topic available to AI agents with a Lightning Table.</p>
     </header>
     <div class="card-body">
       <div class="section-intro">
-    <p class="lead">Real-Time Context Engine (RTCE) exposes a Kafka topic as an MCP tool, so any MCP-compatible AI agent can query the live stream.</p>
+    <p class="lead">A Lightning Table makes the data in an Apache Kafka® topic available for low-latency SQL queries. You enable a Lightning Table for a topic, and then you query it with SQL from the Confluent Cloud Console, an HTTP API, a Model Context Protocol (MCP) client, the Confluent CLI, or a Java Database Connectivity (JDBC) client.</p>
+    <p>First, we are going to see how our agent can query the contents of a topic through MCP.</p>
       
       </div>
-    <p>You enable RTCE <strong>per topic in the Console</strong>. Under your environment's cluster, open <strong><a href="https://confluent.cloud/go/topics">Topics</a> → <code>car_telemetry</code></strong>, open the <strong>Real-Time Context Engine</strong> panel, and click <strong>Enable</strong> (or <strong>Turn on</strong>). Once it's enabled, the <strong>Topics</strong> list shows Real-Time Context Engine <strong>On</strong>:</p>
-    <figure><img src="assets/rtce-topics-list.png" alt="Topics list with the Real-Time Context Engine column"></figure>
-    <p>The panel displays the enablement details (environment, cluster, cloud and region) that an MCP client uses to reach it:</p>
-    <figure><img src="assets/rtce-enabled.png" alt="Real-Time Context Engine enabled for car_telemetry"></figure>
-    <p>You can enable RTCE on <code>car_state</code> and <code>pit_decisions</code> the same way. You'll need them in sections 6 and 7.</p>
+    <p>You enable a Lightning Table <strong>per topic in the Console</strong>:</p>
+    <ol>
+      <li>Under your environment's cluster, choose <strong>Topics</strong> in the navigation menu.</li>
+      <li>You may have to scroll the table to the right to see the <strong>Lightning Tables</strong> column. Click <strong>+ Enable</strong> for the <code>car_telemetry</code> topic.</li>
+      <li>Confirm the dialog and wait for the Lightning Table to be provisioned.</li>
+    </ol>
+    <p>Setup takes a few minutes. When it finishes, a dialog confirms the Lightning Table is enabled, with <strong>SQL</strong>, <strong>API</strong> and <strong>MCP</strong> tabs for querying it.</p>
+    <!-- 👀 New screenshots needed: rtce-topics-list.png and rtce-enabled.png showed the old Real-Time Context Engine column and panel on the Topics page, so they were removed. -->
+    <p>You can enable a Lightning Table on <code>car_state</code> and <code>pit_decisions</code> the same way. You'll need them in sections 6 and 7.</p>
     <div class="more">
       <span class="label">Learn more</span>
       <ul>
-        <li><a href="https://docs.confluent.io/cloud/current/ai/real-time-context-engine/overview.html">Real-Time Context Engine</a></li>
+        <li><a href="https://docs.confluent.io/cloud/current/lightning-tables/overview.html">Lightning Tables</a></li>
+        <li><a href="https://docs.confluent.io/cloud/current/lightning-tables/get-started.html">Get started with Lightning Tables</a></li>
       </ul>
     </div>
     </div>
@@ -1426,26 +1432,34 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
       <h2 class="intro-title">Connect your coding agent</h2>
     </header>
     <div class="card-body">
-    <p>Point your coding agent at RTCE in one command:</p>
+    <p>The Real-Time Context Engine (RTCE) is the MCP interface to Lightning Tables in Confluent Intelligence. Your coding agent connects to it as an MCP server, then queries the most current data of every topic that has a Lightning Table.</p>
+    <p>Point your coding agent at the Real-Time Context Engine in one command:</p>
     <pre data-lang="bash"><code>uv run setup-rtce</code></pre>
-    <p>It asks which coding agent you use (Claude Code, Codex CLI, GitHub Copilot in VS Code or GitHub Copilot CLI) and registers RTCE as an MCP server with it, using the <code>F1_RTCE_MCP_ENDPOINT</code>, <code>F1_RTCE_API_KEY</code>, and <code>F1_RTCE_API_SECRET</code> fields on your credential card. The RTCE key on your card is the Global key your deploy created, so <code>uv run setup-rtce</code> doesn't ask for another one.</p>
+    <p>It asks which coding agent you use (Claude Code, Codex CLI, GitHub Copilot in VS Code or GitHub Copilot CLI) and registers the Real-Time Context Engine with it as an MCP server named <code>real-time-context-engine</code>, using the <code>F1_RTCE_MCP_ENDPOINT</code>, <code>F1_RTCE_API_KEY</code>, and <code>F1_RTCE_API_SECRET</code> fields on your credential card. The key in those fields is the Global key your deploy created, so <code>uv run setup-rtce</code> doesn't ask for another one.</p>
     <p>Restart your coding agent.</p>
+    <div class="more">
+      <span class="label">Learn more</span>
+      <ul>
+        <li><a href="https://docs.confluent.io/cloud/current/ai/real-time-context-engine/overview.html#rtce-in-ccloud">Real-Time Context Engine in Confluent Cloud</a></li>
+        <li><a href="https://docs.confluent.io/cloud/current/lightning-tables/query/mcp.html">Query a Lightning Table with MCP</a></li>
+      </ul>
+    </div>
     </div>
   </article>
 
   <article class="card" id="step-5-3" data-title="5.3 Ask questions in plain English">
     <header class="card-intro">
       <h2 class="intro-title">Ask questions in plain English</h2>
-      <p class="learn"><span class="label">What you'll learn</span>How an AI agent answers questions about a live stream by calling the Real-Time Context Engine.</p>
+      <p class="learn"><span class="label">What you'll learn</span>How an AI agent answers questions about a live stream by querying a Lightning Table.</p>
     </header>
     <div class="card-body">
     <p>Ask your coding agent:</p>
-    <pre data-lang="prompt"><code>What topics do I have access to in the Real-Time Context Engine?</code></pre>
-    <figure><img src="assets/rtce-listtopics.png" alt="Claude listing the topics enabled in the Real-Time Context Engine"></figure>
+    <pre data-lang="prompt"><code>What Lightning Tables do I have access to?</code></pre>
+    <figure><img src="assets/rtce-listtopics.png" alt="Claude listing the topics that have a Lightning Table"></figure>
     <pre data-lang="prompt"><code>How has the engine temperature been trending over the last few laps?</code></pre>
-    <figure><img src="assets/rtce-engine-trend.png" alt="Claude answering how the engine temperature has trended over the last few laps by calling the Real-Time Context Engine"></figure>
+    <figure><img src="assets/rtce-engine-trend.png" alt="Claude answering how the engine temperature has trended over the last few laps by querying a Lightning Table"></figure>
     <pre data-lang="prompt"><code>What's the front-left tire temperature on car 88 right now?</code></pre>
-    <figure><img src="assets/rtce-cartemp.png" alt="Claude answering the front-left tire temperature question by calling the Real-Time Context Engine"></figure>
+    <figure><img src="assets/rtce-cartemp.png" alt="Claude answering the front-left tire temperature question by querying a Lightning Table"></figure>
     <pre data-lang="prompt"><code>At what lap in the race does the engine temperature peak?</code></pre>
     <pre data-lang="prompt"><code>What is the front right tire temperature at lap 30?</code></pre>
     </div>
@@ -1453,25 +1467,25 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
 </section>
 
 <!-- ============================== 6. Social media agent ============================== -->
-<section class="section" id="section-6" data-title="6. Create a social media agent" data-eyebrow="Create a social media agent with Real-Time Context Engine">
+<section class="section" id="section-6" data-title="6. Create a social media agent" data-eyebrow="Create a social media agent with Lightning Tables">
 
   <article class="card" id="step-6-1" data-title="6.1 Draft a post from live race data">
     <header class="card-intro">
       <h2 class="intro-title">Draft a post from live race data</h2>
-      <p class="learn"><span class="label">What you'll learn</span>How to ground an AI agent's output in live race data through the Real-Time Context Engine.</p>
+      <p class="learn"><span class="label">What you'll learn</span>How to ground an AI agent's output in live race data through Lightning Tables.</p>
     </header>
     <div class="card-body">
       <div class="section-intro">
-    <p class="lead">In this section, you switch roles and join River Racing's social media team. Your coding agent already reads the live race data through RTCE. Now you use it to write social media posts.</p>
+    <p class="lead">In this section, you switch roles and join River Racing's social media team. Your coding agent already reads the live race data through Lightning Tables. Now you use it to write social media posts.</p>
       </div>
     <div class="callout info">
       <span class="label">Note</span>
-      <p>Give your persona prompt and post requests to the coding agent you connected to RTCE in 5.2, for example Claude Code, Codex CLI or GitHub Copilot. That agent has the Real-Time Context Engine tools, so it can query the live topics. Another chatbot can't.</p>
+      <p>Give your persona prompt and post requests to the coding agent you connected in 5.2, for example Claude Code, Codex CLI or GitHub Copilot. That agent has the Real-Time Context Engine tools, so it can query the live topics. Another chatbot can't.</p>
     </div>
     <div class="task">
       <span class="label">Your task</span>
       <ol>
-        <li>Enable RTCE on the <code>car_state</code> and <code>pit_decisions</code> topics, the same way you enabled <code>car_telemetry</code> in 5.1.</li>
+        <li>Enable a Lightning Table on the <code>car_state</code> and <code>pit_decisions</code> topics, the same way you did for <code>car_telemetry</code> in 5.1.</li>
         <li>Write a persona prompt that tells your agent how to write engaging social media posts for River Racing.</li>
         <li>Ask your agent to draft a post from the live race data.</li>
       </ol>
@@ -1517,7 +1531,7 @@ OUTPUT
     <details class="trouble">
       <summary><svg class="i"><use href="#i-wrench"/></svg>Troubleshooting<svg class="i chev"><use href="#i-chev"/></svg></summary>
       <ul>
-        <li><strong>The agent says the feed is quiet.</strong> The race may not be running yet, or RTCE isn't enabled on one of the two topics.</li>
+        <li><strong>The agent says the feed is quiet.</strong> The race may not be running yet, or one of the two topics has no Lightning Table yet.</li>
       </ul>
     </details>
     </div>
@@ -1534,14 +1548,14 @@ OUTPUT
     </header>
     <div class="card-body">
       <div class="section-intro">
-    <p class="lead">Lightning Queries run SQL against an RTCE-enabled topic over a low-latency REST API.</p>
+    <p class="lead">Lightning Queries run SQL against a Lightning Table over a low-latency REST API.</p>
       </div>
-    <p>Print a ready-to-run query against <code>car_telemetry</code>, which you enabled in 5.1:</p>
+    <p>Print a ready-to-run query against <code>car_telemetry</code>, whose Lightning Table you enabled in 5.1:</p>
     <pre data-lang="bash"><code>uv run setup-rtce --lightning</code></pre>
     <p>Copy the printed <code>curl</code> command into your terminal and run it. It returns the 10 most recent telemetry rows. You can edit the SQL in its <code>query</code> field to filter for car 88 or select other columns.</p>
     <div class="task">
       <span class="label">Your task</span>
-      <p>Make sure RTCE is enabled on <code>pit_decisions</code> (you did this in 6.1). Then edit the <code>query</code> in the <code>curl</code> command to find out which tire compound the agent recommended on lap 24, and why:</p>
+      <p>Make sure <code>pit_decisions</code> has a Lightning Table (you enabled it in 6.1). Then edit the <code>query</code> in the <code>curl</code> command to find out which tire compound the agent recommended on lap 24, and why:</p>
     </div>
     <pre data-lang="sql"><code>SELECT lap, &lt;column&gt;, &lt;column&gt; FROM pit_decisions WHERE lap = 24 LIMIT 1</code></pre>
     <p>Fill in the first <code>&lt;column&gt;</code> with the recommended tire compound, and the second with the agent's reasoning for that call.</p>
