@@ -386,7 +386,7 @@ rm terraform.tfplan
 
 Each stack belongs to its exact email string, so:
 
-- **removing an email destroys that person's whole stack:** the environment, the cluster, the compute pool, the tables, and any work of theirs in it;
+- **removing an email destroys that person's whole stack:** the environment, the cluster, the compute pool, the tables, and any work of theirs in it. This is also a way to [tear down](#alternative-remove-the-emails);
 - **changing an existing entry**, even only its case, replaces that stack with a new, empty one.
 
 Afterwards, `terraform plan` must again report `No changes.`
@@ -486,6 +486,8 @@ Two more things about the seed:
     terraform state list | grep confluent_environment
     terraform plan -destroy -out=destroy.tfplan
     terraform show destroy.tfplan | grep -A3 confluent_environment
+    # or 
+    terraform show -json destroy.tfplan | tf-summarize -tree
     ```
 
     Terraform deletes only what is in its state, by ID, so these three commands show you the most it can delete. Check that:
@@ -511,6 +513,44 @@ Two more things about the seed:
 No extra step is needed when developers' own Flink statements are still running in their pools: in our testing, `terraform destroy` removed the compute pool, cluster and environment with a developer's statement still running. We're re-confirming this with the workshop's full set of lab statements.
 
 If a developer can't run step 1, their keys outlive their stack. The Kafka and Schema Registry keys are useless once the cluster and environment are gone, but the Global key keeps any other roles that developer holds in your organization. Have them delete it in the Console under **API keys** → **My account**, or delete it yourself.
+
+### Alternative: remove the emails
+
+Instead of steps 2 and 3, you can take stacks down the same way you added them in [step 9](#9-add-everyone-else): take the emails out of `developer_emails` and apply.
+
+Why you might prefer it:
+
+- **You can tear down some people and not others.** `terraform destroy` removes everyone at once. Removing emails lets you take down the stacks of people who are done, or who left early, and stop paying for their clusters straight away. Anyone who needs more time, or an instructor who wants to keep a stack for a follow-up demo, keeps theirs.
+- **It's the workflow you already know.** It's the same `plan -out`, review and `apply` as steps 7 and 9, and the same check the other way round: 15 to destroy per removed email, and nothing to add or change.
+- **`terraform.tfvars` stays the list of who has a stack.** If you comment the entries out rather than deleting them, the list is ready for the next workshop: uncomment and apply. Each returning person gets a new, empty stack, with a new environment suffix.
+
+1. **Each developer whose stack goes runs `uv run destroy` first,** as in step 1 above.
+2. **In `terraform.tfvars`, comment out or delete their entries.** To remove everyone, leave the list empty but keep the `developer_emails` line itself:
+
+    ```hcl
+    developer_emails = [
+      # "jane.doe@example.com",
+      # "john.smith@example.com",
+    ]
+    ```
+
+    `developer_emails` has no default, so if you comment out or delete the whole line, Terraform stops and asks you for it.
+3. **Create the plan and check it:**
+
+    ```bash
+    terraform plan -out=terraform.tfplan
+    terraform show terraform.tfplan | grep -A3 confluent_environment
+    ```
+
+    The plan must end with `Plan: 0 to add, 0 to change, N to destroy.`, where **N is 15 per removed email**. The environments it prints must be exactly those people's `<name>-xxxx_env` environments: compare them with the [handout](#11-developer-access). If anything else shows up, such as a destroy for someone you meant to keep or anything to add or change, an entry was edited rather than removed. Even a change of case replaces that person's stack. Run `rm terraform.tfplan`, fix `terraform.tfvars`, and create the plan again.
+4. **Apply it:**
+
+    ```bash
+    terraform apply terraform.tfplan
+    rm terraform.tfplan
+    ```
+
+    Afterwards, `terraform plan` reports `No changes.` Once everyone is removed, `terraform state list` prints only `data.http.key_owner`, which is a read-only lookup of your key's owner and nothing in your organization.
 
 <details>
 
