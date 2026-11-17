@@ -20,7 +20,7 @@ resource "confluent_environment" "main" {
   display_name = var.environment_name
 
   stream_governance {
-    package = "ADVANCED"
+    package = "ESSENTIALS"
   }
 }
 

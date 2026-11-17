@@ -39,9 +39,9 @@ run "environment_and_direct_binding" {
   assert {
     condition = (
       confluent_environment.main.display_name == "John-Doe-c21e_env" &&
-      confluent_environment.main.stream_governance[0].package == "ADVANCED"
+      confluent_environment.main.stream_governance[0].package == "ESSENTIALS"
     )
-    error_message = "the environment should be named var.environment_name, with Stream Governance ADVANCED"
+    error_message = "the environment should be named var.environment_name, with Stream Governance ESSENTIALS"
   }
 
   assert {
@@ -183,7 +183,30 @@ run "statements_keep_auto_generated_names" {
 # fails with "Reference to uninitialized resource" unless that statement waits
 # for time_sleep.cluster_settle, directly or through another statement. Each
 # prints a "Resource targeting is in effect" warning; that's expected.
-run "car_telemetry_waits_for_cluster" {
+#
+# The model goes first, so it is the one statement that waits for the settle
+# directly; every other statement reaches it through the chain, with a 2-second
+# time_sleep after each statement (the "should wait 2s" asserts).
+run "llm_textgen_model_waits_for_cluster" {
+  command = plan
+
+  module {
+    source = "./modules/developer"
+  }
+
+  plan_options {
+    target = [confluent_flink_statement.llm_textgen_model]
+  }
+
+  assert {
+    condition     = time_sleep.cluster_settle.create_duration == "60s"
+    error_message = "llm_textgen_model should wait for time_sleep.cluster_settle"
+  }
+}
+
+# car_telemetry follows the model, so it is never submitted alongside it, and
+# reaches the settle through it.
+run "car_telemetry_waits_for_model" {
   command = plan
 
   module {
@@ -195,7 +218,17 @@ run "car_telemetry_waits_for_cluster" {
   }
 
   assert {
-    condition     = time_sleep.cluster_settle.create_duration == "30s"
+    condition     = time_sleep.after_llm_textgen_model.create_duration == "2s"
+    error_message = "create_car_telemetry_table should wait 2s after llm_textgen_model (time_sleep.after_llm_textgen_model)"
+  }
+
+  assert {
+    condition     = strcontains(confluent_flink_statement.llm_textgen_model.statement, "CREATE MODEL IF NOT EXISTS")
+    error_message = "create_car_telemetry_table should depend on llm_textgen_model"
+  }
+
+  assert {
+    condition     = time_sleep.cluster_settle.create_duration == "60s"
     error_message = "create_car_telemetry_table should wait for time_sleep.cluster_settle"
   }
 }
@@ -212,7 +245,12 @@ run "race_standings_waits_for_cluster" {
   }
 
   assert {
-    condition     = time_sleep.cluster_settle.create_duration == "30s"
+    condition     = time_sleep.after_car_telemetry_table.create_duration == "2s"
+    error_message = "create_race_standings_table should wait 2s after create_car_telemetry_table (time_sleep.after_car_telemetry_table)"
+  }
+
+  assert {
+    condition     = time_sleep.cluster_settle.create_duration == "60s"
     error_message = "create_race_standings_table should wait for time_sleep.cluster_settle"
   }
 }
@@ -229,32 +267,13 @@ run "driver_race_history_waits_for_cluster" {
   }
 
   assert {
-    condition     = time_sleep.cluster_settle.create_duration == "30s"
+    condition     = time_sleep.after_race_standings_table.create_duration == "2s"
+    error_message = "create_driver_race_history_table should wait 2s after create_race_standings_table (time_sleep.after_race_standings_table)"
+  }
+
+  assert {
+    condition     = time_sleep.cluster_settle.create_duration == "60s"
     error_message = "create_driver_race_history_table should wait for time_sleep.cluster_settle"
-  }
-}
-
-# The model goes last, after the seed, so it is never submitted alongside
-# another statement; it reaches the settle through the chain.
-run "llm_textgen_model_waits_for_seed" {
-  command = plan
-
-  module {
-    source = "./modules/developer"
-  }
-
-  plan_options {
-    target = [confluent_flink_statement.llm_textgen_model]
-  }
-
-  assert {
-    condition     = startswith(confluent_flink_statement.seed_driver_race_history.statement, "INSERT INTO `driver_race_history`")
-    error_message = "llm_textgen_model should depend on seed_driver_race_history"
-  }
-
-  assert {
-    condition     = time_sleep.cluster_settle.create_duration == "30s"
-    error_message = "llm_textgen_model should wait for time_sleep.cluster_settle"
   }
 }
 
@@ -272,12 +291,17 @@ run "seed_waits_for_driver_race_history_table" {
   }
 
   assert {
+    condition     = time_sleep.after_driver_race_history_table.create_duration == "2s"
+    error_message = "seed_driver_race_history should wait 2s after create_driver_race_history_table (time_sleep.after_driver_race_history_table)"
+  }
+
+  assert {
     condition     = strcontains(confluent_flink_statement.create_driver_race_history_table.statement, "CREATE TABLE IF NOT EXISTS `driver_race_history`")
     error_message = "seed_driver_race_history should depend on create_driver_race_history_table"
   }
 
   assert {
-    condition     = time_sleep.cluster_settle.create_duration == "30s"
+    condition     = time_sleep.cluster_settle.create_duration == "60s"
     error_message = "seed_driver_race_history should wait for time_sleep.cluster_settle"
   }
 }

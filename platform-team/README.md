@@ -8,16 +8,16 @@ It is everything you need to prepare, run and clean up the workshop's environmen
 
 This Terraform module builds **each developer's workshop stack**:
 
-- **a new, empty environment**, named after their email (see [Environment names](#environment-names)), with the Stream Governance Advanced package, and a role binding that makes the developer **EnvironmentAdmin** on it through their own user account;
+- **a new, empty environment**, named after their email (see [Environment names](#environment-names)), with the Stream Governance Essentials package, and a role binding that makes the developer **EnvironmentAdmin** on it through their own user account;
 - **a Standard, single-zone Kafka cluster**, `RIVER-RACING-DEMO-CLUSTER`, on AWS in `region` (default `us-east-1`, the same for everyone). The environment's Schema Registry comes up with it;
 - **a Flink compute pool**, `RIVER-RACING-DEMO-pool`, that scales on demand up to `flink_max_cfu` CFUs (default 10);
-- **the workshop's tables and AI model:** `car_telemetry` and `race_standings` (empty until the developer starts the race), `driver_race_history` with its 198 historical rows, and `llm_textgen_model` on the Confluent-hosted `anthropic.claude-sonnet-4-6` (`csp_hosted_model`).
+- **the workshop's tables and AI model:** `car_telemetry` and `race_standings` (empty until the developer starts the race), `driver_race_history` with its 198 historical rows, and `llm_textgen_model` on the Confluent-hosted `anthropic.claude-sonnet-4-6` (`csp_hosted_model`). e
 
 **It creates no service accounts and no API keys.** Your only key is the OrganizationAdmin Global key you run this module with. It is the provider credential and signs every Flink statement, which runs as the key's owner.
 
 **One environment per person, instructors included,** and no spares: an environment is only useful to the person bound to it, and each one runs a Kafka cluster. Someone who joins late is added in minutes ([step 9](#9-add-everyone-else)).
 
-On the developer side, each person signs in to the Console (through SSO, if you use it), runs `confluent login`, then `uv run deploy --track pre-provisioned` from the [workshop repository](https://github.com/confluentinc/demo-confluent-intelligence-f1), with no Terraform. The deploy mints a Global, a Kafka and a Schema Registry key for their own account and writes them to a local credential card. It creates nothing else in the environment, except the `driver_race_history` rows if the table is empty. The developer's own lab statements run as the developer, in your compute pool. The full developer steps are in the [pre-provisioned walkthrough](../docs/tracks/PRE-PROVISIONED.md).
+On the developer side, each person signs in to the Console (through SSO, if you use it), runs `confluent login`, then `uv run deploy --track pre-provisioned` from the [workshop repository](https://github.com/dimi-vo/demo-confluent-intelligence-f1), with no Terraform. The deploy mints a Global, a Kafka and a Schema Registry key for their own account and writes them to a local credential card. It creates nothing else in the environment, except the `driver_race_history` rows if the table is empty. The developer's own lab statements run as the developer, in your compute pool. The full developer steps are in the [pre-provisioned walkthrough](../docs/tracks/PRE-PROVISIONED.md).
 
 ## Your steps
 
@@ -96,17 +96,46 @@ The module looks each email up and **never invites anyone:** an email that isn't
 confluent iam user list
 ```
 
-Every developer's email must be in the `Email` column, and that is how you'll write it in [step 7](#7-create-the-instructors-environments). If someone is missing:
+If someone is missing, create a new Local User for each attendee to avoid permission confusions.
 
-- **With SSO,** a user appears after their first sign-in. Ask them to sign in to [Confluent Cloud](https://confluent.cloud) once.
-- **Without SSO,** invite them, and have them accept the invitation from their email:
+Follow this approach, i.e. using the `+f1workshop` in their email, to create a new Local User for new or existing users.
 
-    ```bash
-    confluent iam user invitation create <email>
-    confluent iam user invitation list
-    ```
+They invited users will need to accept the invitation that will arrive in their email, and set a password.
 
-Developers need no roles before the apply. We will make each one `EnvironmentAdmin` after the provision of their environments.
+There are two options to invite users.
+
+### Create Local User Accounts in the Confluent Cloud UI (Recommended)
+
+Log in the Confluent Cloud console with the account that has the `OrganizationAdmin` role.
+
+Create the new users via the Confluent Cloud Console.
+
+1. Go to [https://confluent.cloud/settings/org/accounts/users](https://confluent.cloud/settings/org/accounts/users)
+2. Click on `+ Add user`
+3. Deselect `Add Confluent default user permissions`
+4. Select `Use local authentication for this user`
+5. Click `Continue`
+6. Do not select any permissions – this will be done by Terraform. Simply click on `Add user`.
+7. Confirm the dialogue by clicking on `I'll do it later`.
+
+![alt text](image.png)
+
+### Create Local User Accounts via the CLI (Only if no SSO is configured)
+
+> [!IMPORTANT]
+>
+> If SSO is already enabled for your organization, the authentication method for invited users is automatically set to SSO.
+>
+> You would then need to update each user's authentication method via the Confluent Cloud UI to Local.
+>
+> The invited users would then need to reset their password
+> ![alt text](image-1.png)
+
+You can invite users to your organization using the Confluent CLI
+
+```bash
+confluent iam user invitation create name+f1workshop@company.com
+```
 
 ## 4. Check your quotas
 
@@ -127,11 +156,11 @@ Each prints one row, like this (columns after `Usage` trimmed):
                                | Organization                   |              |               |       |
 ```
 
-**For each of the three, `Applied Limit` minus `Usage` must be at least N.** 
+**For each of the three, `Applied Limit` minus `Usage` must be at least N.**
 
-An empty `Usage` means 0. 
+An empty `Usage` means 0.
 
-In the example, the organization has room for 28 more environments. 
+In the example, the organization has room for 28 more environments.
 
 > ![IMPORTANT]
 >
@@ -181,25 +210,102 @@ Then:
 ```bash
 terraform init
 terraform plan -out=terraform.tfplan
+```
+
+Review the plan
+
+```bash
+terraform show -json terraform.tfplan
+# you can install tf-summarize
+#     brew install tf-summarize
+# and see your output formatted nicely:
+terraform show -json terraform.tfplan | tf-summarize -tree
+```
+
+The plan should look like `Plan: N to add, 0 to change, 0 to destroy.`, where **N is 15 per person**.
+
+<details>
+<summary>Expected output of <code>tf-summarize</code></summary>
+
+```nocode
+|---random_id
+|	|---env_suffix["dvogiatzis+f1workshop1@confluent.io"](+)
+|	|---env_suffix["dvogiatzis+f1workshop2@confluent.io"](+)
+|---module
+|	|---developer["dvogiatzis+f1workshop1@confluent.io"]
+|	|	|---data
+|	|	|	|---confluent_schema_registry_cluster
+|	|	|	|	|---main(~)
+|	|	|---confluent_environment
+|	|	|	|---main(+)
+|	|	|---confluent_flink_compute_pool
+|	|	|	|---main(+)
+|	|	|---confluent_flink_statement
+|	|	|	|---create_car_telemetry_table(+)
+|	|	|	|---create_driver_race_history_table(+)
+|	|	|	|---create_race_standings_table(+)
+|	|	|	|---llm_textgen_model(+)
+|	|	|	|---seed_driver_race_history(+)
+|	|	|---confluent_kafka_cluster
+|	|	|	|---main(+)
+|	|	|---confluent_role_binding
+|	|	|	|---developer_env_admin(+)
+|	|	|---time_sleep
+|	|	|	|---after_car_telemetry_table(+)
+|	|	|	|---after_driver_race_history_table(+)
+|	|	|	|---after_llm_textgen_model(+)
+|	|	|	|---after_race_standings_table(+)
+|	|	|	|---cluster_settle(+)
+|	|---developer["dvogiatzis+f1workshop2@confluent.io"]
+|	|	|---data
+|	|	|	|---confluent_schema_registry_cluster
+|	|	|	|	|---main(~)
+|	|	|---confluent_environment
+|	|	|	|---main(+)
+|	|	|---confluent_flink_compute_pool
+|	|	|	|---main(+)
+|	|	|---confluent_flink_statement
+|	|	|	|---create_car_telemetry_table(+)
+|	|	|	|---create_driver_race_history_table(+)
+|	|	|	|---create_race_standings_table(+)
+|	|	|	|---llm_textgen_model(+)
+|	|	|	|---seed_driver_race_history(+)
+|	|	|---confluent_kafka_cluster
+|	|	|	|---main(+)
+|	|	|---confluent_role_binding
+|	|	|	|---developer_env_admin(+)
+|	|	|---time_sleep
+|	|	|	|---after_car_telemetry_table(+)
+|	|	|	|---after_driver_race_history_table(+)
+|	|	|	|---after_llm_textgen_model(+)
+|	|	|	|---after_race_standings_table(+)
+|	|	|	|---cluster_settle(+)
+```
+</details>
+
+Apply the plan
+
+```bash
 terraform apply terraform.tfplan
 rm terraform.tfplan
 ```
 
-**`terraform plan`** ends with `Plan: N to add, 0 to change, 0 to destroy.`, where **N is 11 per person**.
+In the case of failures like
 
-1. A random name suffix
-2. One environment
-3. One role binding for the user
-4. One Standard cluster
-5. One Flink compute pool
-6. A 60-second pause
-7. Flink statement: create the `llm_textgen_model` model
-8. Flink statement: create the `car_telemetry` table
-9. Flink statement: create the `race_standings` table
-10. Flink statement: create the `driver_race_history` table
-11. Flink statement: seed `driver_race_history` with its 198 rows
+- `Error: error creating Flink Statement`
+- or errors related to the creation of the LLM model
 
-It fails before creating anything if:
+Try to create the resources again via
+
+```bash
+terraform plan -out=terraform.tfplan
+terraform show terraform.tfplan
+terraform apply terraform.tfplan
+```
+
+> [!IMPORTANT] The terraform plan will fail for users who have not accepted the invitation.
+
+The terraform script fails before creating anything if:
 
 - your key or secret is wrong, or the key has expired or been deleted;
 - an email isn't a user in your organization;
@@ -220,14 +326,6 @@ terraform output -raw handout
 **`terraform plan`** must report `No changes.` Applying again never renames an environment, because each name's suffix is kept in state.
 
 **`terraform output -raw handout`** lists each person's environment name and ID (see [step 11](#11-developer-access)).
-
-To see one environment's Flink statements, with its ID from the handout:
-
-```bash
-confluent flink statement list --environment <env-id> --cloud aws --region <region>
-```
-
-All five of yours (named `tf-…`) should be `COMPLETED`. The seed is the `INSERT INTO driver_race_history` one: Terraform returns as soon as it starts running, so this is where you see it finish.
 
 ### If the apply stops
 
@@ -265,11 +363,26 @@ If not done already, shortly before the workshop, add everyone else's emails to 
 
 ```bash
 terraform plan -out=terraform.tfplan
+```
+
+Review the plan
+
+```bash
+terraform show -json terraform.tfplan
+# you can install tf-summarize
+#     brew install tf-summarize
+# and see your output formatted nicely:
+terraform show -json terraform.tfplan | tf-summarize -tree
+```
+
+**Check the plan before you apply it:** it must say `0 to change, 0 to destroy`, **with 15 to add per new person**.
+
+Apply the plan
+
+```bash
 terraform apply terraform.tfplan
 rm terraform.tfplan
 ```
-
-**Check the plan before you apply it:** it must say `0 to change, 0 to destroy`, **with 11 to add per new person**. 
 
 Each stack belongs to its exact email string, so:
 
@@ -378,7 +491,7 @@ Two more things about the seed:
     Terraform deletes only what is in its state, by ID, so these three commands show you the most it can delete. Check that:
 
     - **`terraform state list`** shows one environment per developer, and no others.
-    - **`terraform plan -destroy`** ends with `Plan: 0 to add, 0 to change, N to destroy.`, where **N is 11 per developer**: the same 11 resources as in [step 7](#7-create-the-instructors-environments).
+    - **`terraform plan -destroy`** ends with `Plan: 0 to add, 0 to change, N to destroy.`, where **N is 15 per developer**: the same 15 resources as in [step 7](#7-create-the-instructors-environments).
     - **`terraform show`** prints each environment's `display_name` and `id`. They must be exactly the `<name>-xxxx_env` environments this module created, and nothing else. Compare the IDs with `confluent environment list`: an environment from another project, in the same organization, must not appear.
 
     The plan lists only the resources Terraform created. A developer's own topics, schemas and Flink statements aren't listed, but they go with their cluster, compute pool and environment.
@@ -412,7 +525,7 @@ Each environment is named after the part of the email before the `@`, plus a ran
 ### Cost
 
 - **Per developer, from your apply until your destroy:** a Standard Kafka cluster, and Flink compute (CFUs, used on demand, up to `flink_max_cfu` per developer). Developers' own streaming statements keep running, and can keep using compute, until you destroy their stack, even after they've run `uv run destroy`. Plus the pit-strategy agent's AI model calls (see [step 8](#8-rehearse-the-developer-flow)).
-- **Per environment, until you destroy it:** Stream Governance Advanced. Every environment is created with the Advanced package, which is billed per environment and **can't be downgraded**.
+- **Per environment:** nothing for Stream Governance. Every environment gets the Essentials package, which is free for up to 100 schemas; a developer creates far fewer.
 
 ### Terraform state
 

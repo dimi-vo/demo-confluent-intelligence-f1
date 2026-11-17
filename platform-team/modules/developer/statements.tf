@@ -11,6 +11,57 @@
 # terraform/self-service, and the seed is generated from
 # scripts/selfservice/seed.py, because this folder has to work on its own;
 # tests/test_platform_team_sync.py in the workshop repo catches drift.
+#
+# The statements run in a chain, so no two are ever submitted together: the
+# model first (the only one that waits for time_sleep.cluster_settle), then
+# car_telemetry, race_standings, driver_race_history and the seed. Each
+# statement waits local.statement_gap after the one before it, through a
+# time_sleep that depends on that statement. The sleep's trigger replaces it
+# whenever that statement is replaced, so the gap also holds when one apply
+# re-creates both statements.
+
+# CSP Hosted Flink Model Inference only: Confluent runs the model, so there is
+# no connection and no AWS key. Same name and options as terraform/self-service's
+# 'confluent' branch, so LAB 4's agent SQL doesn't change.
+locals {
+  statement_gap = "2s"
+
+  llm_textgen_with = join(", ", [
+    "'provider' = 'confluent'",
+    "'task' = 'text_generation'",
+    "'confluent.model' = '${var.csp_hosted_model}'",
+    "'confluent.params.max_tokens' = '50000'",
+  ])
+}
+
+resource "confluent_flink_statement" "llm_textgen_model" {
+  organization { id = data.confluent_organization.main.id }
+  environment { id = confluent_environment.main.id }
+  compute_pool { id = confluent_flink_compute_pool.main.id }
+  principal { id = var.principal_id }
+  rest_endpoint = data.confluent_flink_region.main.rest_endpoint
+  credentials {
+    key    = var.confluent_cloud_api_key
+    secret = var.confluent_cloud_api_secret
+  }
+
+  statement = "CREATE MODEL IF NOT EXISTS `${confluent_environment.main.display_name}`.`${confluent_kafka_cluster.main.display_name}`.`llm_textgen_model` INPUT (prompt STRING) OUTPUT (response STRING) WITH (${local.llm_textgen_with});"
+
+  properties = {
+    "sql.current-catalog"  = confluent_environment.main.display_name
+    "sql.current-database" = confluent_kafka_cluster.main.display_name
+  }
+
+  depends_on = [time_sleep.cluster_settle]
+}
+
+resource "time_sleep" "after_llm_textgen_model" {
+  create_duration = local.statement_gap
+
+  triggers = {
+    statement_id = confluent_flink_statement.llm_textgen_model.id
+  }
+}
 
 resource "confluent_flink_statement" "create_car_telemetry_table" {
   organization { id = data.confluent_organization.main.id }
@@ -69,7 +120,15 @@ resource "confluent_flink_statement" "create_car_telemetry_table" {
     "sql.current-database" = confluent_kafka_cluster.main.display_name
   }
 
-  depends_on = [time_sleep.cluster_settle]
+  depends_on = [time_sleep.after_llm_textgen_model]
+}
+
+resource "time_sleep" "after_car_telemetry_table" {
+  create_duration = local.statement_gap
+
+  triggers = {
+    statement_id = confluent_flink_statement.create_car_telemetry_table.id
+  }
 }
 
 resource "confluent_flink_statement" "create_race_standings_table" {
@@ -115,7 +174,15 @@ resource "confluent_flink_statement" "create_race_standings_table" {
     "sql.current-database" = confluent_kafka_cluster.main.display_name
   }
 
-  depends_on = [confluent_flink_statement.create_car_telemetry_table]
+  depends_on = [time_sleep.after_car_telemetry_table]
+}
+
+resource "time_sleep" "after_race_standings_table" {
+  create_duration = local.statement_gap
+
+  triggers = {
+    statement_id = confluent_flink_statement.create_race_standings_table.id
+  }
 }
 
 # Created empty; the seed INSERT depends on this statement.
@@ -161,7 +228,15 @@ resource "confluent_flink_statement" "create_driver_race_history_table" {
     "sql.current-database" = confluent_kafka_cluster.main.display_name
   }
 
-  depends_on = [confluent_flink_statement.create_race_standings_table]
+  depends_on = [time_sleep.after_race_standings_table]
+}
+
+resource "time_sleep" "after_driver_race_history_table" {
+  create_duration = local.statement_gap
+
+  triggers = {
+    statement_id = confluent_flink_statement.create_driver_race_history_table.id
+  }
 }
 
 # The 198 historical rows, as one bounded INSERT that names no catalog (the
@@ -196,38 +271,5 @@ resource "confluent_flink_statement" "seed_driver_race_history" {
     "sql.current-database" = confluent_kafka_cluster.main.display_name
   }
 
-  depends_on = [confluent_flink_statement.create_driver_race_history_table]
-}
-
-# CSP Hosted Flink Model Inference only: Confluent runs the model, so there is
-# no connection and no AWS key. Same name and options as terraform/self-service's
-# 'confluent' branch, so LAB 4's agent SQL doesn't change.
-locals {
-  llm_textgen_with = join(", ", [
-    "'provider' = 'confluent'",
-    "'task' = 'text_generation'",
-    "'confluent.model' = '${var.csp_hosted_model}'",
-    "'confluent.params.max_tokens' = '50000'",
-  ])
-}
-
-resource "confluent_flink_statement" "llm_textgen_model" {
-  organization { id = data.confluent_organization.main.id }
-  environment { id = confluent_environment.main.id }
-  compute_pool { id = confluent_flink_compute_pool.main.id }
-  principal { id = var.principal_id }
-  rest_endpoint = data.confluent_flink_region.main.rest_endpoint
-  credentials {
-    key    = var.confluent_cloud_api_key
-    secret = var.confluent_cloud_api_secret
-  }
-
-  statement = "CREATE MODEL IF NOT EXISTS `${confluent_environment.main.display_name}`.`${confluent_kafka_cluster.main.display_name}`.`llm_textgen_model` INPUT (prompt STRING) OUTPUT (response STRING) WITH (${local.llm_textgen_with});"
-
-  properties = {
-    "sql.current-catalog"  = confluent_environment.main.display_name
-    "sql.current-database" = confluent_kafka_cluster.main.display_name
-  }
-
-  depends_on = [confluent_flink_statement.seed_driver_race_history]
+  depends_on = [time_sleep.after_driver_race_history_table]
 }
