@@ -292,40 +292,15 @@ To restart the race, follow [Start from a clean slate](#start-from-a-clean-slate
 
 **What you'll learn:** why a regular join is the wrong tool for enriching a stream, and how a temporal join relates each telemetry reading to the race standings that were valid at that moment.
 
-In traditional SQL databases there's a whole family of join operations: inner and outer joins, left and right joins, and so on. Flink supports all of these classic SQL joins, but in most situations it's a mistake to use them in your Flink SQL applications. The reason has to do with what it means to execute a join in a streaming fashion.
+Flink supports all of the traditional join operations: inner, outer, left, right joins, and so on. But in most situations it's a mistake to use them! The reason has to do with what it means to execute a join in a streaming fashion.
 
-Typically, two tables are related by having the primary key of one table present as a foreign key in another table. In our race data, each record in `race_standings` has a `car_number` column that is its primary key:
+Typically, two tables are related by having the primary key of one table present as a foreign key in another table. In our race data, each record in `race_standings` has a `car_number` column that is its primary key. You can verify this by describing each table.
 
-```sql
-CREATE TABLE IF NOT EXISTS `race_standings` (
-  `car_number` INT,
-  -- ...
-  -- ... the rest of the fields
-  -- ...
-  `event_time` TIMESTAMP(3),
-  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '10' SECOND,
-  PRIMARY KEY (`car_number`) NOT ENFORCED -- 👈
-) DISTRIBUTED BY (`car_number`) INTO 1 BUCKETS
-WITH (
-  'changelog.mode' = 'upsert'
-  -- ... the rest of the options
-);
-```
+The effect of setting up `race_standings` this way is that each new record in the standings stream replaces whatever was previously stored for that same car. `race_standings` was created as an upsert table: Flink reads each record as an insert, or as an update of the row with the same primary key.
 
-The effect of setting up `race_standings` this way is that each new record in the standings stream replaces whatever was previously stored for that same car. It's `'changelog.mode' = 'upsert'` that makes `race_standings` an upsert table: Flink reads each record as an insert, or as an update of the row with the same primary key.
+`car_telemetry`, on the other hand, is modeled as append. Sensor readings are immutable, so the stream is insert-only rather than updating, and there's no primary key.
 
-`car_telemetry`, on the other hand, is modeled differently. Sensor readings are immutable, so the stream is insert-only rather than updating, and there's no primary key. Here, `'changelog.mode' = 'append'` makes `car_telemetry` an append-only table: Flink reads every record as a new row, never as an update of an earlier one. Each reading has a foreign-key relationship to the car it belongs to:
-
-```sql
-CREATE TABLE `car_telemetry` (
-  `car_number` INT,
-  -- ... more sensor columns
-  `event_time` TIMESTAMP(3),
-  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '5' SECOND
-) WITH ('changelog.mode' = 'append');
-```
-
-This makes it possible to join telemetry to standings, which you might do to enrich each reading with race context. A regular join seems like a very natural way to do it:
+Each reading still carries its car's `car_number`, so you can join telemetry to standings to enrich each reading with race context. A regular join seems like a very natural way to do it:
 
 ```sql
 SELECT
@@ -344,9 +319,12 @@ SELECT
  r.tire_compound, 
  r.tire_age_laps
 FROM `car_telemetry` t
-JOIN `race_standings` r
+JOIN `race_standings`
+ /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ r
  ON t.car_number = r.car_number
 ```
+
+The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-offset`, Flink reads `race_standings` from the earliest available offset, so the query also sees standings written before it started.
 
 The output looks right, but **don't do this!** Stop the query.
 
@@ -354,13 +332,37 @@ The output looks right, but **don't do this!** Stop the query.
 >
 > A regular inner join is not what you want for stream enrichment. It produces an updating table, so a later standings update can change or remove results that were already emitted. It also keeps both inputs in state forever.
 
-**Your task:** rewrite the query as a *temporal join*, which enriches each telemetry reading with the standings of its car as of the reading's `event_time`.
+Here's the same query rewritten as a temporal join:
+
+```sql
+SELECT
+ t.car_number,
+ t.event_time,
+ t.lap,
+ t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+ t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+ t.engine_temp_c,
+ t.brake_temp_fl_c, t.brake_temp_fr_c,
+ t.battery_charge_pct,
+ t.fuel_remaining_kg,
+ r.`position`,
+ r.gap_to_ahead_sec, r.gap_to_leader_sec,
+ r.pit_stops,
+ r.tire_compound,
+ r.tire_age_laps
+FROM `car_telemetry` t
+JOIN `race_standings`
+ /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+ FOR SYSTEM_TIME AS OF <time attribute> AS r
+ ON t.car_number = r.car_number
+```
+
+**Your task:** replace `<time attribute>` so the *temporal join* enriches each telemetry reading with the standings of its car at the moment the reading was taken.
 
 <details>
 <summary>💡 Hint</summary>
 
-- A temporal join adds `FOR SYSTEM_TIME AS OF <time attribute>` after the versioned table, here `race_standings`. The time attribute is the telemetry reading's `t.event_time`.
-- To make sure the query also sees standings written before it started, read `race_standings` from the earliest offset with an `OPTIONS` hint: `/*+ OPTIONS('scan.startup.mode'='earliest-offset') */`.
+`<time attribute>` is the time at which the telemetry reading happened. The join looks up the standings as they were at that moment. `race_standings` has a column with the same name, so prefix it with the telemetry table's alias, `t`.
 
 </details>
 
@@ -403,8 +405,6 @@ There are some restrictions, however:
 
 In Confluent Cloud for Apache Flink, `$rowtime` is a system column equal to the Kafka record timestamp. You can instead use a column such as `event_time` for event-time operations, provided you declare it as a time attribute with a `WATERMARK` clause. The platform team already did this for both tables when they provisioned the resources (see [`statements.tf`](../../platform-team/modules/developer/statements.tf)).
 
-The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-offset`, Flink reads `race_standings` from the earliest available offset.
-
 </details>
 
 > [!IMPORTANT]
@@ -430,27 +430,30 @@ The `OPTIONS` hint sets `scan.startup.mode` for this query only. With `earliest-
 
 Windows are central to processing infinite streams. Windows split the stream into "buckets" of finite size, over which you can apply computations.
 
-Flink provides 4 built-in windowing functions: `TUMBLE`, `HOP`, `CUMULATE` and `SESSION`. Here's an example of the invocation of the `TUMBLE` function:
+Flink provides 4 built-in windowing functions: `TUMBLE`, `HOP`, `CUMULATE` and `SESSION`. Here's a window aggregation that uses the `TUMBLE` function. Its select list and `GROUP BY` are complete, but the `TUMBLE` arguments are placeholders:
 
 ```sql
-SELECT * FROM TABLE(TUMBLE(TABLE data, DESCRIPTOR(timecol), size))
+SELECT
+  window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+  AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+  AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+  AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+  AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+  AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+  AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg
+FROM TABLE(TUMBLE(TABLE <table>, DESCRIPTOR(<time attribute>), <window size>))
+GROUP BY window_start, window_end, window_time, car_number
 ```
-
-The `TUMBLE` Table-Valued Function (TVF) returns the input columns plus `window_start`, `window_end`, and `window_time`.
 
 For the purpose of this demo, every lap takes exactly 20 seconds.
 
-**Your task:**
-
-1. Use a window aggregation to calculate the average of every `car_telemetry` data point per lap.
-2. Extend the query to include our driver's position in the race, which is paramount to developing our racing strategy. Use the result of the temporal join from 2.2 in this statement.
+**Your task:** replace `<table>`, `<time attribute>` and `<window size>` in the `TUMBLE` call so the query calculates the average of every `car_telemetry` data point per lap.
 
 <details>
 <summary>💡 Hint 1</summary>
 
-- A lap takes exactly 20 seconds, so a 20-second tumbling window holds one lap: `TUMBLE(TABLE car_telemetry, DESCRIPTOR(event_time), INTERVAL '20' SECOND)`.
-- Group by the window columns (`window_start`, `window_end`, `window_time`) and `car_number`.
-- Average the telemetry columns.
+- `<table>` is the table to window, `<time attribute>` is the column that places each row in a window (wrapped in `DESCRIPTOR`), and `<window size>` is the length of each window.
+- A lap takes exactly 20 seconds, so one window should cover exactly one lap. Write the size as an `INTERVAL`, for example `INTERVAL '5' MINUTE`.
 
 </details>
 
@@ -472,11 +475,52 @@ GROUP BY window_start, window_end, window_time, car_number
 
 </details>
 
+Aggregating the car telemetry data per lap is the right first step, but we also need to know where we stand in the race! The query below reuses the temporal join from 2.2, which enriches each telemetry reading with our position in the race:
+
+```sql
+WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings`
+    /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+    FOR SYSTEM_TIME AS OF <time attribute> AS r
+    ON t.car_number = r.car_number
+)
+SELECT
+  window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+  AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+  AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+  AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+  AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+  AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+  AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+  MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+  MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+FROM TABLE(TUMBLE(TABLE <table>, DESCRIPTOR(<time attribute>), <window size>))
+GROUP BY window_start, window_end, window_time, car_number
+```
+
+**Your task:** replace `<table>`, `<time attribute>` and `<window size>` in the `TUMBLE` call so the query also includes our driver's position in the race, which is paramount to developing our racing strategy.
+
 <details>
 <summary>💡 Hint 2</summary>
 
-- Join first, then window: wrap the temporal join in a CTE (`WITH enriched AS (...)`) and pass `TABLE enriched` to `TUMBLE`.
-- Keep the averages from part 1, and use `MAX()` for the race-standings columns (position, gaps, pit stops, tire compound and tire age).
+- `<table>` is the CTE, `enriched`. The window now runs over the enriched readings instead of `car_telemetry`.
+- `<time attribute>` and `<window size>` are the same as in part 1.
 
 </details>
 
@@ -536,15 +580,13 @@ You now have a streaming query that produces, in real time, one row per lap with
 
 We now have a statement that gives us the position of our driver and the state of their car in real time. In this step, we use machine learning to spot anomalies in tire degradation.
 
-Thankfully, we can use Flink's built-in ML functions. The `ML_DETECT_ANOMALIES` function uses an ARIMA model to identify outliers in our time-series data.
-
-This is how you call the function:
+We will use Flink's built-in `ML_DETECT_ANOMALIES` function, which uses an ARIMA model to identify outliers in our time-series data.
 
 ```sql
 ML_DETECT_ANOMALIES(value, timestamp [, config])
 ```
 
-Pass it this configuration as `config`. The detector needs some history before it can flag anything: `'minTrainingSize' VALUE 12` makes it wait for 12 windows.
+The ARIMA model needs some history before it can flag anything. Tuning the model isn't part of this exercise, so we'll use the configuration below.
 
 ```sql
 JSON_OBJECT(
@@ -555,21 +597,67 @@ JSON_OBJECT(
 )
 ```
 
-**Your task:** reuse the previous statement to spot anomalies in the **front-left tire temperature** (`tire_temp_fl_c`).
+The statement below wraps the query from 2.3 in a second CTE, `windowed`, and runs the anomaly detection over its rows:
+
+```sql
+WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings`
+    /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+    FOR SYSTEM_TIME AS OF <time attribute> AS r
+    ON t.car_number = r.car_number
+),
+windowed AS (
+  SELECT
+    window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+    AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+    AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+    AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+    AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+    AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+    AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+    MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+    MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+  FROM TABLE(TUMBLE(TABLE <table>, DESCRIPTOR(<time attribute>), <window size>))
+  GROUP BY window_start, window_end, window_time, car_number
+)
+SELECT *,
+  ML_DETECT_ANOMALIES(
+    <value>,
+    <timestamp>,
+    JSON_OBJECT('minTrainingSize' VALUE 12, 'maxTrainingSize' VALUE 50, 'confidencePercentage' VALUE 99.99, 'enableStl' VALUE FALSE)
+  )
+  OVER (
+    PARTITION BY <partition column>
+    ORDER BY <order column>
+    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ) AS anomaly_tire_temp_fl_result
+FROM windowed
+```
+
+**Your task:** replace `<value>`, `<timestamp>`, `<partition column>` and `<order column>` so the query spots anomalies in the **front-left tire temperature** (`tire_temp_fl_c`).
 
 <details>
 <summary>💡 Hint</summary>
 
-- Wrap the window aggregation from 2.3 in a second CTE (for example `windowed`), and select from it.
-- `ML_DETECT_ANOMALIES` runs over an `OVER` window. The `OVER` clause looks like this:
-
-  ```sql
-  OVER (
-      PARTITION BY ...
-      ORDER BY ...
-      RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-  ) AS anomaly_tire_temp_fl_result
-  ```
+- `<value>` is the column to check for anomalies.
+- `<timestamp>` and `<order column>` are both the time attribute of the windowed rows. `TUMBLE` adds it, next to `window_start` and `window_end`.
+- `<partition column>` decides whose history the detector learns from. We want one history per car.
 
 </details>
 
@@ -677,29 +765,87 @@ Leave the race stopped for now. You create `car_state` in 2.6 and the strategy a
 
 **What you'll learn:** how `CREATE TABLE ... AS SELECT` (CTAS) turns a query into a statement that runs continuously and writes its results to a new table.
 
-Now combine the join, the window aggregation and the anomaly detection from 2.2–2.4 into one statement that creates the `car_state` table. `car_state` holds one row per car (our team only has one car in this example) for every lap (one 20-second window).
+The statement below combines the join, the window aggregation and the anomaly detection from 2.2–2.4 into one statement that creates the `car_state` table. `car_state` holds one row per car (our team only has one car in this example) for every lap (one 20-second window).
 
-The table has these columns. The telemetry values are averages over the lap.
+The statement also sets two options in its `WITH` clause: `'changelog.mode'` and `'kafka.consumer.isolation-level' = 'read-uncommitted'`. Think about which changelog mode `car_state` needs.
 
-- `car_number`: the car's number.
-- `lap`: the lap number, starting at lap 1.
-- `tire_temp_fl_c`, `tire_temp_fr_c`, `tire_temp_rl_c`, `tire_temp_rr_c`: the temperature of each tire (front-left, front-right, rear-left, rear-right), in °C.
-- `tire_pressure_fl_psi`, `tire_pressure_fr_psi`, `tire_pressure_rl_psi`, `tire_pressure_rr_psi`: the pressure of each tire, in psi.
-- `engine_temp_c`: the engine temperature, in °C.
-- `brake_temp_fl_c`, `brake_temp_fr_c`: the temperature of each front brake, in °C.
-- `battery_charge_pct`: the battery charge, in percent.
-- `fuel_remaining_kg`: the fuel left in the car, in kg.
-- `anomaly_tire_temp_fl`: `true` when `ML_DETECT_ANOMALIES` finds the front-left tire temperature higher than expected, otherwise `false`.
-- `position`: the car's position in the race.
-- `gap_to_ahead_sec`: the gap to the car ahead, in seconds.
-- `gap_to_leader_sec`: the gap to the race leader, in seconds.
-- `pit_stops`: the number of pit stops the car has made.
-- `tire_compound`: the current tire compound, for example `SOFT`.
-- `tire_age_laps`: how many laps the current tires have done.
+Here's the statement. The `CASE` expression decides the value of `anomaly_tire_temp_fl`, but you write its contents:
 
-The `CREATE TABLE` statement must also set two options in its `WITH` clause: `'changelog.mode' = '...'` and `'kafka.consumer.isolation-level' = 'read-uncommitted'`. Think about which mode `car_state` needs.
+```sql
+CREATE TABLE `car_state` WITH ('changelog.mode' = <changelog mode>, 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
+WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings`
+    /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+    FOR SYSTEM_TIME AS OF <time attribute> AS r
+    ON t.car_number = r.car_number
+),
+windowed AS (
+  SELECT
+    window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+    AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+    AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+    AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+    AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+    AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+    AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+    MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+    MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+  FROM TABLE(TUMBLE(TABLE <table>, DESCRIPTOR(<time attribute>), <window size>))
+  GROUP BY window_start, window_end, window_time, car_number
+),
+anomaly AS (
+  SELECT *,
+    ML_DETECT_ANOMALIES(
+      <value>,
+      <timestamp>,
+      JSON_OBJECT('minTrainingSize' VALUE 12, 'maxTrainingSize' VALUE 50, 'confidencePercentage' VALUE 99.99, 'enableStl' VALUE FALSE)
+    )
+    OVER (
+      PARTITION BY <partition column>
+      ORDER BY <order column>
+      RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS anomaly_tire_temp_fl_result
+  FROM windowed
+)
+SELECT
+  car_number, lap,
+  tire_temp_fl_c, tire_temp_fr_c, tire_temp_rl_c, tire_temp_rr_c,
+  tire_pressure_fl_psi, tire_pressure_fr_psi, tire_pressure_rl_psi, tire_pressure_rr_psi,
+  engine_temp_c, brake_temp_fl_c, brake_temp_fr_c, battery_charge_pct, fuel_remaining_kg,
+  CASE
+    WHEN <condition> THEN <then value>
+    ELSE <else value>
+  END AS anomaly_tire_temp_fl,
+  `position`, gap_to_ahead_sec, gap_to_leader_sec, pit_stops, tire_compound, tire_age_laps
+FROM anomaly
+WHERE lap > 0;
+```
 
-**Your task:** put together everything you've built so far to create the `car_state` table.
+**Your task:** replace `<changelog mode>`, `<condition>`, `<then value>` and `<else value>`, then run the statement to create the `car_state` table.
+
+<details>
+<summary>💡 Hint</summary>
+
+- `anomaly_tire_temp_fl_result` is the output of the ARIMA model. It's a row with fields such as `actual_value`, `forecast_value`, `lower_bound`, `upper_bound` and `is_anomaly`. Read a field with a dot, for example `anomaly_tire_temp_fl_result.is_anomaly`.
+- Use those fields to define what an anomaly is for us. `is_anomaly` on its own also flags a tire that's colder than expected. Which value do we care about, and which bound should it cross?
+
+</details>
 
 <details>
 <summary>✅ Solution</summary>
@@ -1000,7 +1146,42 @@ The dashboard shows the Silverstone track map, the live leaderboard, and car #88
 
 ![Pit Wall dashboard showing a nominal front-left tire temperature](../assets/self-service/pitwall-nominal.png)
 
-### 4.2 Review `car_state`
+### 4.2 Why `car_state` is two laps behind (optional)
+
+**What you'll learn:** how a watermark decides when Flink closes a window, and why that keeps `car_state` two laps behind the race.
+
+Compare the Pit Wall's lap counter with the newest row of a `car_state` query: when the counter shows lap 7, the newest row is lap 5. The **AI Pit Strategist** feed, which labels each decision with its lap, is just as far behind. Nothing is wrong: your statement is waiting for its watermark.
+
+**One lap comes from the window.** Each 20-second `TUMBLE` window sums up a whole lap, so Flink can only write lap 5's row once lap 5 is over, and by then the counter shows lap 6.
+
+**The other lap comes from the watermark.** Flink doesn't close a window when the clock passes the window's end, but when the *watermark* does. The watermark is Flink's estimate of how far event time has got. Each table's `WATERMARK` clause, which you saw in [2.2](#22-join-streams), keeps it a fixed margin behind the latest `event_time` Flink has read from that table. A join can only move on once both of its inputs have, so its watermark is the lower of the two:
+
+| Table | Watermark | New rows arrive |
+|---|---|---|
+| `car_telemetry` | latest `event_time` − 5 seconds | every 2 seconds |
+| `race_standings` | latest `event_time` − 10 seconds | once per lap, as the lap starts |
+
+`race_standings` is what holds the window open: its margin is bigger, and its watermark only moves once per lap. For example, lap 5 runs from second 80 to second 100 of the race:
+
+| Second | `race_standings` receives | Its watermark | Lap 5's window (80–100) |
+|---|---|---|---|
+| 80 | lap 5's standings | 70 | Open: it collects lap 5's telemetry |
+| 100 | lap 6's standings | 90 | Still open: 90 is before its end, 100 |
+| 120 | lap 7's standings | 110 | Closed: Flink writes lap 5's row |
+
+At second 120, the counter shows lap 7. Every lap goes the same way, so `car_state` stays two laps behind, and each row arrives about 20 seconds after its lap ends.
+
+The rest of the pipeline inherits the delay. `pit_decisions` makes one agent call per `car_state` row, so the **AI Pit Strategist** is two laps behind too, plus the few seconds the model takes to answer. The lap 24 anomaly reaches the dashboard when the counter shows lap 26.
+
+A smaller margin would shorten the wait, at a cost: once the watermark passes a moment, Flink treats that moment as finished, so a row from it that arrives later is left out of the results.
+
+**Learn more**
+
+- [Time and Watermarks](https://docs.confluent.io/cloud/current/flink/concepts/timely-stream-processing.html)
+- [Window Aggregation Queries](https://docs.confluent.io/cloud/current/flink/reference/queries/window-aggregation.html)
+- [Event-time temporal joins](https://docs.confluent.io/cloud/current/flink/reference/queries/joins.html#event-time-temporal-joins)
+
+### 4.3 Review `car_state`
 
 **What you'll learn:** how `car_state` fills up lap by lap, when the anomaly detector has enough history to flag a spike, and how to query the table your statement writes to.
 
@@ -1061,12 +1242,12 @@ It returns nothing until lap 24, about 8 minutes into the race. Leave it running
 <details>
 <summary>🛠️ Troubleshooting</summary>
 
-- **`car_state` is empty at first.** `f1-race` waits up to 20 seconds before lap 1, and Flink writes a lap's row only after the lap ends, so the first row can take a minute or so to appear.
+- **`car_state` is empty at first.** `f1-race` waits up to 20 seconds before lap 1, and Flink writes a lap's row about 20 seconds after the lap ends (see [4.2](#42-why-car_state-is-two-laps-behind-optional)), so the first row can take a minute or so to appear.
 - **No anomaly at lap 24, or lap numbers start over at 1.** `car_state` needs one clean race from lap 1. The topics held more than one race when you created it, or the race looped after lap 60. Follow [Start from a clean slate](#start-from-a-clean-slate).
 
 </details>
 
-### 4.3 Watch the agent's decisions
+### 4.4 Watch the agent's decisions
 
 **What you'll learn:** how to read the agent's lap-by-lap recommendations, including its call on the lap 24 anomaly.
 

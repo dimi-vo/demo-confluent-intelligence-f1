@@ -82,8 +82,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .arrow:active:not(:disabled), .arrow.pressed:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 var(--border-strong); } /* .pressed: the ← / → keys */
 .arrow:disabled { opacity: .35; cursor: default; }
 
-/* Side cards: Learn more, with Troubleshooting below it, both collapsible (top left) */
-.side-panels { grid-area: learn; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+/* Side cards: Learn more, with Troubleshooting below it, both collapsible (top left); Suggested time opposite them (top right) */
+.side-row { grid-area: learn; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+.side-panels { display: flex; flex: 1 1 220px; min-width: 0; flex-direction: column; align-items: flex-start; gap: 10px; }
 .side-panel { width: fit-content; min-width: 220px; max-width: 100%; overflow: hidden; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; }
 .sp-toggle { display: flex; align-items: center; gap: 8px; width: 100%; height: 37px; padding: 9px 14px; border: 0; border-bottom: 1px solid transparent; background: var(--bar); color: var(--midnight); font: 600 13px var(--sans); text-align: left; white-space: nowrap; cursor: pointer; }
 .sp-toggle:hover { color: var(--denim); }
@@ -99,7 +100,17 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .trouble-panel .sp-body { color: var(--muted); font-size: 13.5px; }
 .trouble-panel .sp-body li { margin-bottom: 12px; line-height: 1.5; }
 .trouble-panel .sp-body strong { color: var(--text); }
+.time-panel { flex: none; margin-left: auto; min-width: 180px; overflow: hidden; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; }
+.tp-head { display: flex; align-items: center; gap: 8px; height: 37px; padding: 9px 14px; border-bottom: 1px solid var(--border); background: var(--bar); color: var(--midnight); font: 600 13px var(--sans); white-space: nowrap; }
+.tp-body { padding: 10px 16px 12px; font-variant-numeric: tabular-nums; }
+.tp-step { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 12px; margin: 0; }
+.tp-min { color: var(--midnight); font-size: 18px; font-weight: 700; line-height: 1.35; }
+.tp-range { color: var(--muted); font-size: 14px; }
+.tp-section { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--hairline); color: var(--faint); font-size: 12.5px; line-height: 1.45; }
 @media (min-width: 1280px) {
+  .side-row { margin: 0; } /* both its cards are fixed in the margins here */
+  /* Mirrors the Learn more card: same height, same width, right margin. */
+  .time-panel { position: fixed; top: 84px; right: 16px; z-index: 30; width: clamp(180px, calc((100vw - 860px) / 2 - 30px), 240px); min-width: 0; }
   /* Fixed in the left margin, and never lower than the top of the ‹ arrow: open cards share the room and scroll. */
   .side-panels { position: fixed; top: 84px; left: 16px; z-index: 30; width: clamp(180px, calc((100vw - 860px) / 2 - 30px), 240px); max-height: calc(50vh - 126px); margin: 0; align-items: stretch; }
   .side-panel { display: flex; flex-direction: column; flex: 0 1 auto; width: auto; min-width: 0; min-height: 39px; } /* exactly the toggle (37px) plus the panel's own border, so no white strip shows under it */
@@ -201,12 +212,26 @@ button[data-testid="create-workspace-button"] { display: inline-block; padding: 
 .t-f { color: #A6E9C1; }
 .t-q { color: #B9C2EE; }
 .t-o { color: #9BB5FF; }
+.t-p { padding: 0 4px; border-radius: 4px; background: #FFD58A; color: var(--midnight); font-weight: 600; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 
 /* Toggles */
 .reveals { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
 .reveal-btn { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--denim); font: 500 14px var(--sans); cursor: pointer; }
 .reveal-btn:hover { border-color: var(--denim); }
 .reveal-btn[aria-expanded="true"] { background: var(--denim-soft); border-color: var(--denim); }
+/* Hold to show a solution: the pill fills over the hold, and drains back if released early. */
+.reveal-btn.hold { position: relative; isolation: isolate; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.hold-fill { position: absolute; inset: 0; z-index: -1; background: var(--denim-soft); transform-origin: 0 50%; transform: scaleX(0); transition: transform .25s ease-out; }
+.reveal-btn.holding .hold-fill { transform: scaleX(1); transition: transform var(--hold-ms) linear; }
+.reveal-btn[aria-expanded="true"] .hold-fill { display: none; }
+.reveal-btn.nudge { animation: nudge .3s ease; }
+@keyframes nudge { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .reveal-btn.nudge { animation: none; } }
+/* Time lock: greyed out with a clock icon until the unlock time; a press says when. */
+.reveal-pair { display: inline-flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
+.reveal-btn.locked, .reveal-btn.locked:hover { border-color: var(--border); color: var(--faint); cursor: not-allowed; }
+.lock-note { color: var(--muted); font-size: 13.5px; }
+.lock-note:not(:empty) { margin-left: 10px; }
 .reveal { margin: 10px 0 18px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: #FBFAF7; font-size: 15.5px; }
 .reveal > :last-child { margin-bottom: 0; }
 .reveal-title { margin-bottom: 8px; color: var(--faint); font-size: 11.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
@@ -356,6 +381,7 @@ ol.steps-list > li > p { margin-bottom: 8px; }
 </header>
 
 <div class="stage">
+  <div class="side-row">
   <div class="side-panels">
     <aside class="side-panel learn-panel" id="learn-panel" aria-label="Learn more" hidden>
       <button class="sp-toggle" type="button" aria-expanded="false"><svg class="i"><use href="#i-book"/></svg><span>Learn more</span><span class="sp-count"></span><svg class="i chev"><use href="#i-chev"/></svg></button>
@@ -365,6 +391,14 @@ ol.steps-list > li > p { margin-bottom: 8px; }
       <button class="sp-toggle" type="button" aria-expanded="false"><svg class="i"><use href="#i-wrench"/></svg><span>Troubleshooting</span><span class="sp-count"></span><svg class="i chev"><use href="#i-chev"/></svg></button>
       <div class="sp-body"><ul></ul></div>
     </aside>
+  </div>
+  <aside class="time-panel" id="time-panel" aria-label="Suggested time" hidden>
+    <div class="tp-head"><svg class="i"><use href="#i-clock"/></svg><span>Suggested time</span></div>
+    <div class="tp-body">
+      <p class="tp-step"><strong class="tp-min"></strong><span class="tp-range"></span></p>
+      <p class="tp-section"></p>
+    </div>
+  </aside>
   </div>
   <button class="arrow prev" id="prev-btn" type="button" aria-label="Previous step"><svg class="i"><use href="#i-chev-left"/></svg></button>
   <main class="deck" id="deck">
@@ -383,9 +417,10 @@ ol.steps-list > li > p { margin-bottom: 8px; }
     <p>Each step starts with what you'll learn and your task. Try the task yourself first:</p>
     <ul>
       <li>Use <strong>Show hint</strong> if you're stuck.</li>
-      <li>Use <strong>Show solution</strong> to check your answer or copy the statement.</li>
+      <li>Press and hold <strong>Show solution</strong> to check your answer or copy the statement. Each solution unlocks 5 minutes before the end of its step.</li>
       <li><strong>Learn more</strong> links to the Confluent documentation.</li>
       <li><strong>Troubleshooting</strong> covers what can go wrong in that step.</li>
+      <li><strong>Suggested time</strong> shows how long a step should take, and when to work on it if you start section 1 at 09:10. You have 2 hours 30 minutes from the start of section 1 to the end of section 7.</li>
     </ul>
     <h3>What's inside</h3>
     <ul class="agenda" id="agenda"></ul>
@@ -522,7 +557,7 @@ cd demo-confluent-intelligence-f1</code></pre>
 <!-- ============================== 1. Flink ============================== -->
 <section class="section" id="section-1" data-title="1. Get familiar with Flink" data-eyebrow="Get familiar with Flink">
 
-  <article class="card" id="step-1-1" data-title="1.1 The Flink SQL workspace">
+  <article class="card" id="step-1-1" data-minutes="5" data-title="1.1 The Flink SQL workspace">
     <header class="card-intro">
       <h2 class="intro-title">The Flink SQL workspace</h2>
       <p class="learn"><span class="label">What you'll learn</span>What a Flink SQL workspace and a compute pool are, and how Kafka resources map to Flink catalogs, databases and tables.</p>
@@ -563,7 +598,7 @@ cd demo-confluent-intelligence-f1</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-1-2" data-title="1.2 Data exploration">
+  <article class="card" id="step-1-2" data-minutes="10" data-title="1.2 Data exploration">
     <header class="card-intro">
       <h2 class="intro-title">Data exploration</h2>
       <p class="learn"><span class="label">What you'll learn</span>How to inspect tables with <code>SHOW</code> and <code>DESCRIBE</code>, and what makes a query a streaming query.</p>
@@ -615,7 +650,7 @@ where `finishing_pos` = 1;</code></pre>
 <!-- ============================== 2. Enrich ============================== -->
 <section class="section" id="section-2" data-title="2. Enrich the data with built-in ML functions" data-eyebrow="Enrich the data with built-in ML functions">
 
-  <article class="card" id="step-2-1" data-title="2.1 Start the race">
+  <article class="card" id="step-2-1" data-minutes="5" data-title="2.1 Start the race">
     <header class="card-intro">
       <h2 class="intro-title">Start the race</h2>
     </header>
@@ -639,36 +674,17 @@ where `finishing_pos` = 1;</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-2-2" data-title="2.2 Join streams">
+  <article class="card" id="step-2-2" data-minutes="10" data-title="2.2 Join streams">
     <header class="card-intro">
       <h2 class="intro-title">Join streams</h2>
       <p class="learn"><span class="label">What you'll learn</span>Why a regular join is the wrong tool for enriching a stream, and how a temporal join relates each telemetry reading to the race standings that were valid at that moment.</p>
     </header>
     <div class="card-body">
-    <p>In traditional SQL databases there's a whole family of join operations: inner and outer joins, left and right joins, and so on. Flink supports all of these classic SQL joins, but in most situations it's a mistake to use them in your Flink SQL applications. The reason has to do with what it means to execute a join in a streaming fashion.</p>
-    <p>Typically, two tables are related by having the primary key of one table present as a foreign key in another table. In our race data, each record in <code>race_standings</code> has a <code>car_number</code> column that is its primary key:</p>
-    <pre data-lang="sql"><code>CREATE TABLE IF NOT EXISTS `race_standings` (
-  `car_number` INT,
-  -- ...
-  -- ... the rest of the fields
-  -- ...
-  `event_time` TIMESTAMP(3),
-  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '10' SECOND,
-  PRIMARY KEY (`car_number`) NOT ENFORCED -- 👈
-) DISTRIBUTED BY (`car_number`) INTO 1 BUCKETS
-WITH (
-  'changelog.mode' = 'upsert'
-  -- ... the rest of the options
-);</code></pre>
-    <p>The effect of setting up <code>race_standings</code> this way is that each new record in the standings stream replaces whatever was previously stored for that same car. It's <code>'changelog.mode' = 'upsert'</code> that makes <code>race_standings</code> an upsert table: Flink reads each record as an insert, or as an update of the row with the same primary key.</p>
-    <p><code>car_telemetry</code>, on the other hand, is modeled differently. Sensor readings are immutable, so the stream is insert-only rather than updating, and there's no primary key. Here, <code>'changelog.mode' = 'append'</code> makes <code>car_telemetry</code> an append-only table: Flink reads every record as a new row, never as an update of an earlier one. Each reading has a foreign-key relationship to the car it belongs to:</p>
-    <pre data-lang="sql"><code>CREATE TABLE `car_telemetry` (
-  `car_number` INT,
-  -- ... more sensor columns
-  `event_time` TIMESTAMP(3),
-  WATERMARK FOR `event_time` AS `event_time` - INTERVAL '5' SECOND
-) WITH ('changelog.mode' = 'append');</code></pre>
-    <p>This makes it possible to join telemetry to standings, which you might do to enrich each reading with race context. A regular join seems like a very natural way to do it:</p>
+    <p>Flink supports all of the traditional join operations: inner, outer, left, right joins, and so on. But in most situations it's a mistake to use them! The reason has to do with what it means to execute a join in a streaming fashion.</p>
+    <p>Typically, two tables are related by having the primary key of one table present as a foreign key in another table. In our race data, each record in <code>race_standings</code> has a <code>car_number</code> column that is its primary key. You can verify this by describing each table.</p>
+    <p>The effect of setting up <code>race_standings</code> this way is that each new record in the standings stream replaces whatever was previously stored for that same car. <code>race_standings</code> was created as an upsert table: Flink reads each record as an insert, or as an update of the row with the same primary key.</p>
+    <p><code>car_telemetry</code>, on the other hand, is modeled as append. Sensor readings are immutable, so the stream is insert-only rather than updating, and there's no primary key.</p>
+    <p>Each reading still carries its car's <code>car_number</code>, so you can join telemetry to standings to enrich each reading with race context. A regular join seems like a very natural way to do it:</p>
     <pre data-lang="sql"><code>SELECT
  t.car_number, 
  t.event_time, 
@@ -685,22 +701,53 @@ WITH (
  r.tire_compound, 
  r.tire_age_laps
 FROM `car_telemetry` t
-JOIN `race_standings` r
+JOIN `race_standings`
+ /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ r
  ON t.car_number = r.car_number</code></pre>
+    <p>The <code>OPTIONS</code> hint sets <code>scan.startup.mode</code> for this query only. With <code>earliest-offset</code>, Flink reads <code>race_standings</code> from the earliest available offset, so the query also sees standings written before it started.</p>
     <p>The output looks right, but <strong>don't do this!</strong> Stop the query.</p>
     <div class="callout important">
       <span class="label">Important</span>
       <p>A regular inner join is not what you want for stream enrichment. It produces an updating table, so a later standings update can change or remove results that were already emitted. It also keeps both inputs in state forever.</p>
     </div>
+    <p>Here's the same query rewritten as a temporal join:</p>
+    <pre data-lang="sql"><code>SELECT
+ t.car_number,
+ t.event_time,
+ t.lap,
+ t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+ t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+ t.engine_temp_c,
+ t.brake_temp_fl_c, t.brake_temp_fr_c,
+ t.battery_charge_pct,
+ t.fuel_remaining_kg,
+ r.`position`,
+ r.gap_to_ahead_sec, r.gap_to_leader_sec,
+ r.pit_stops,
+ r.tire_compound,
+ r.tire_age_laps
+FROM `car_telemetry` t
+JOIN `race_standings`
+ /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+ FOR SYSTEM_TIME AS OF &lt;time attribute&gt; AS r
+ ON t.car_number = r.car_number</code></pre>
     <div class="task">
       <span class="label">Your task</span>
-      <p>Rewrite the query as a <em>temporal join</em>, which enriches each telemetry reading with the standings of its car as of the reading's <code>event_time</code>.</p>
+      <p>Replace <code>&lt;time attribute&gt;</code> so the <em>temporal join</em> enriches each telemetry reading with the standings of its car at the moment the reading was taken.</p>
     </div>
     <div class="reveal" data-kind="hint" data-label="hint">
-      <ul>
-        <li>A temporal join adds <code>FOR SYSTEM_TIME AS OF &lt;time attribute&gt;</code> after the versioned table, here <code>race_standings</code>. The time attribute is the telemetry reading's <code>t.event_time</code>.</li>
-        <li>To make sure the query also sees standings written before it started, read <code>race_standings</code> from the earliest offset with an <code>OPTIONS</code> hint: <code>/*+ OPTIONS('scan.startup.mode'='earliest-offset') */</code>.</li>
-      </ul>
+      <p><code>&lt;time attribute&gt;</code> is the time at which the telemetry reading happened. The join looks up the standings as they were at that moment. <code>race_standings</code> has a column with the same name, so prefix it with the telemetry table's alias, <code>t</code>.</p>
+      <p>Step through the animation to see how a temporal join gives each telemetry reading the version of the standings that was valid at its event time.</p>
+      <div class="tj" role="group" aria-label="Animation: how a temporal join works, in four steps">
+        <div class="tj-frame" role="img" aria-label="Animated diagram of the current step"><div class="tj-stage"></div></div>
+        <div class="tj-bar">
+          <ol class="tj-steps"></ol>
+          <button class="tj-btn tj-back" type="button">Back</button>
+          <button class="tj-btn tj-replay" type="button">Replay</button>
+          <button class="tj-btn tj-primary tj-next" type="button">Next</button>
+        </div>
+        <div class="tj-caption" aria-live="polite"></div>
+      </div>
     </div>
     <div class="reveal" data-kind="solution" data-label="solution">
       <pre data-lang="sql"><code>SELECT
@@ -723,17 +770,6 @@ JOIN `race_standings`
  /*+ OPTIONS('scan.startup.mode'='earliest-offset') */ 
  FOR SYSTEM_TIME AS OF t.event_time AS r 
  ON t.car_number = r.car_number</code></pre>
-      <p>Step through the animation to see how a temporal join gives each telemetry reading the version of the standings that was valid at its event time.</p>
-      <div class="tj" role="group" aria-label="Animation: how a temporal join works, in four steps">
-        <div class="tj-frame" role="img" aria-label="Animated diagram of the current step"><div class="tj-stage"></div></div>
-        <div class="tj-bar">
-          <ol class="tj-steps"></ol>
-          <button class="tj-btn tj-back" type="button">Back</button>
-          <button class="tj-btn tj-replay" type="button">Replay</button>
-          <button class="tj-btn tj-primary tj-next" type="button">Next</button>
-        </div>
-        <div class="tj-caption" aria-live="polite"></div>
-      </div>
       <p>This query relates each <code>car_telemetry</code> record to the most recent <code>race_standings</code> record for that car, as of the time of that reading (<code>t.event_time</code>). This is almost always what you really want. Compared to a regular inner join, a temporal join has a number of other advantages:</p>
       <ul>
         <li>The output stream is insert-only rather than updating, so you can apply any sort of further processing to it.</li>
@@ -746,7 +782,6 @@ JOIN `race_standings`
         <li>The primary key of the versioned table must be used in the equivalence condition of the temporal join. Here, that's <code>t.car_number = r.car_number</code>.</li>
       </ul>
       <p>In Confluent Cloud for Apache Flink, <code>$rowtime</code> is a system column equal to the Kafka record timestamp. You can instead use a column such as <code>event_time</code> for event-time operations, provided you declare it as a time attribute with a <code>WATERMARK</code> clause. The platform team already did this for both tables when they provisioned the resources (see <a href="https://github.com/dimi-vo/demo-confluent-intelligence-f1/blob/master/platform-team/modules/developer/statements.tf"><code>statements.tf</code></a>).</p>
-      <p>The <code>OPTIONS</code> hint sets <code>scan.startup.mode</code> for this query only. With <code>earliest-offset</code>, Flink reads <code>race_standings</code> from the earliest available offset.</p>
     </div>
     <div class="callout important">
       <span class="label">Important</span>
@@ -770,30 +805,34 @@ JOIN `race_standings`
     </div>
   </article>
 
-  <article class="card" id="step-2-3" data-title="2.3 Window aggregations">
+  <article class="card" id="step-2-3" data-minutes="10" data-title="2.3 Window aggregations">
     <header class="card-intro">
       <h2 class="intro-title">Window aggregations</h2>
       <p class="learn"><span class="label">What you'll learn</span>How windowing functions split an infinite stream into finite windows, and how to aggregate each window.</p>
     </header>
     <div class="card-body">
     <p>Windows are central to processing infinite streams. Windows split the stream into "buckets" of finite size, over which you can apply computations.</p>
-    <p>Flink provides 4 built-in windowing functions: <code>TUMBLE</code>, <code>HOP</code>, <code>CUMULATE</code> and <code>SESSION</code>. Here's an example of the invocation of the <code>TUMBLE</code> function:</p>
-    <pre data-lang="sql"><code>SELECT * FROM TABLE(TUMBLE(TABLE data, DESCRIPTOR(timecol), size))</code></pre>
-    <p>The <code>TUMBLE</code> Table-Valued Function (TVF) returns the input columns plus <code>window_start</code>, <code>window_end</code>, and <code>window_time</code>.</p>
+    <p>Flink provides 4 built-in windowing functions: <code>TUMBLE</code>, <code>HOP</code>, <code>CUMULATE</code> and <code>SESSION</code>. Here's a window aggregation that uses the <code>TUMBLE</code> function. Its select list and <code>GROUP BY</code> are complete, but the <code>TUMBLE</code> arguments are placeholders:</p>
+    <pre data-lang="sql"><code>SELECT
+  window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+  AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+  AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+  AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+  AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+  AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+  AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg
+FROM TABLE(TUMBLE(TABLE &lt;table&gt;, DESCRIPTOR(&lt;time attribute&gt;), &lt;window size&gt;))
+GROUP BY window_start, window_end, window_time, car_number</code></pre>
     <p>For the purpose of this demo, every lap takes exactly 20 seconds.</p>
     <div class="task">
       <span class="label">Your task</span>
-      <ol>
-        <li>Use a window aggregation to calculate the average of every <code>car_telemetry</code> data point per lap.</li>
-        <li>Extend the query to include our driver's position in the race, which is paramount to developing our racing strategy. Use the result of the temporal join from 2.2 in this statement.</li>
-      </ol>
+      <p>Replace <code>&lt;table&gt;</code>, <code>&lt;time attribute&gt;</code> and <code>&lt;window size&gt;</code> in the <code>TUMBLE</code> call so the query calculates the average of every <code>car_telemetry</code> data point per lap.</p>
     </div>
     <div>
     <div class="reveal" data-kind="hint" data-label="hint 1">
       <ul>
-        <li>A lap takes exactly 20 seconds, so a 20-second tumbling window holds one lap: <code>TUMBLE(TABLE car_telemetry, DESCRIPTOR(event_time), INTERVAL '20' SECOND)</code>.</li>
-        <li>Group by the window columns (<code>window_start</code>, <code>window_end</code>, <code>window_time</code>) and <code>car_number</code>.</li>
-        <li>Average the telemetry columns.</li>
+        <li><code>&lt;table&gt;</code> is the table to window, <code>&lt;time attribute&gt;</code> is the column that places each row in a window (wrapped in <code>DESCRIPTOR</code>), and <code>&lt;window size&gt;</code> is the length of each window.</li>
+        <li>A lap takes exactly 20 seconds, so one window should cover exactly one lap. Write the size as an <code>INTERVAL</code>, for example <code>INTERVAL '5' MINUTE</code>.</li>
       </ul>
     </div>
     <div class="reveal" data-kind="solution" data-label="solution 1: averages per lap">
@@ -809,11 +848,50 @@ FROM TABLE(TUMBLE(TABLE car_telemetry, DESCRIPTOR(event_time), INTERVAL '20' SEC
 GROUP BY window_start, window_end, window_time, car_number</code></pre>
     </div>
     </div>
+    <p>Aggregating the car telemetry data per lap is the right first step, but we also need to know where we stand in the race! The query below reuses the temporal join from 2.2, which enriches each telemetry reading with our position in the race:</p>
+    <pre data-lang="sql"><code>WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings`
+    /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+    FOR SYSTEM_TIME AS OF &lt;time attribute&gt; AS r
+    ON t.car_number = r.car_number
+)
+SELECT
+  window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+  AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+  AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+  AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+  AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+  AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+  AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+  MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+  MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+FROM TABLE(TUMBLE(TABLE &lt;table&gt;, DESCRIPTOR(&lt;time attribute&gt;), &lt;window size&gt;))
+GROUP BY window_start, window_end, window_time, car_number</code></pre>
+    <div class="task">
+      <span class="label">Your task</span>
+      <p>Replace <code>&lt;table&gt;</code>, <code>&lt;time attribute&gt;</code> and <code>&lt;window size&gt;</code> in the <code>TUMBLE</code> call so the query also includes our driver's position in the race, which is paramount to developing our racing strategy.</p>
+    </div>
     <div>
     <div class="reveal" data-kind="hint" data-label="hint 2">
       <ul>
-        <li>Join first, then window: wrap the temporal join in a CTE (<code>WITH enriched AS (...)</code>) and pass <code>TABLE enriched</code> to <code>TUMBLE</code>.</li>
-        <li>Keep the averages from part 1, and use <code>MAX()</code> for the race-standings columns (position, gaps, pit stops, tire compound and tire age).</li>
+        <li><code>&lt;table&gt;</code> is the CTE, <code>enriched</code>. The window now runs over the enriched readings instead of <code>car_telemetry</code>.</li>
+        <li><code>&lt;time attribute&gt;</code> and <code>&lt;window size&gt;</code> are the same as in part 1.</li>
       </ul>
     </div>
     <div class="reveal" data-kind="solution" data-label="solution 2: with the race position">
@@ -865,37 +943,80 @@ GROUP BY window_start, window_end, window_time, car_number</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-2-4" data-title="2.4 Detect anomalies with built-in ML">
+  <article class="card" id="step-2-4" data-minutes="10" data-title="2.4 Detect anomalies with built-in ML">
     <header class="card-intro">
       <h2 class="intro-title">Detect anomalies with built-in ML</h2>
       <p class="learn"><span class="label">What you'll learn</span>How to run Confluent's built-in <code>ML_DETECT_ANOMALIES</code> function over an <code>OVER</code> window to flag outliers in a time series.</p>
     </header>
     <div class="card-body">
     <p>We now have a statement that gives us the position of our driver and the state of their car in real time. In this step, we use machine learning to spot anomalies in tire degradation.</p>
-    <p>Thankfully, we can use Flink's built-in ML functions. The <code>ML_DETECT_ANOMALIES</code> function uses an ARIMA model to identify outliers in our time-series data.</p>
-    <p>This is how you call the function:</p>
+    <p>We will use Flink's built-in <code>ML_DETECT_ANOMALIES</code> function, which uses an ARIMA model to identify outliers in our time-series data.</p>
     <pre data-lang="sql"><code>ML_DETECT_ANOMALIES(value, timestamp [, config])</code></pre>
-    <p>Pass it this configuration as <code>config</code>. The detector needs some history before it can flag anything: <code>'minTrainingSize' VALUE 12</code> makes it wait for 12 windows.</p>
+    <p>The ARIMA model needs some history before it can flag anything. Tuning the model isn't part of this exercise, so we'll use the configuration below.</p>
     <pre data-lang="sql"><code>JSON_OBJECT(
   'minTrainingSize' VALUE 12,
   'maxTrainingSize' VALUE 50,
   'confidencePercentage' VALUE 99.99,
   'enableStl' VALUE FALSE
 )</code></pre>
+    <p>The statement below wraps the query from 2.3 in a second CTE, <code>windowed</code>, and runs the anomaly detection over its rows:</p>
+    <pre data-lang="sql"><code>WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings`
+    /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+    FOR SYSTEM_TIME AS OF &lt;time attribute&gt; AS r
+    ON t.car_number = r.car_number
+),
+windowed AS (
+  SELECT
+    window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+    AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+    AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+    AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+    AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+    AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+    AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+    MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+    MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+  FROM TABLE(TUMBLE(TABLE &lt;table&gt;, DESCRIPTOR(&lt;time attribute&gt;), &lt;window size&gt;))
+  GROUP BY window_start, window_end, window_time, car_number
+)
+SELECT *,
+  ML_DETECT_ANOMALIES(
+    &lt;value&gt;,
+    &lt;timestamp&gt;,
+    JSON_OBJECT('minTrainingSize' VALUE 12, 'maxTrainingSize' VALUE 50, 'confidencePercentage' VALUE 99.99, 'enableStl' VALUE FALSE)
+  )
+  OVER (
+    PARTITION BY &lt;partition column&gt;
+    ORDER BY &lt;order column&gt;
+    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ) AS anomaly_tire_temp_fl_result
+FROM windowed</code></pre>
     <div class="task">
       <span class="label">Your task</span>
-      <p>Reuse the previous statement to spot anomalies in the <strong>front-left tire temperature</strong> (<code>tire_temp_fl_c</code>).</p>
+      <p>Replace <code>&lt;value&gt;</code>, <code>&lt;timestamp&gt;</code>, <code>&lt;partition column&gt;</code> and <code>&lt;order column&gt;</code> so the query spots anomalies in the <strong>front-left tire temperature</strong> (<code>tire_temp_fl_c</code>).</p>
     </div>
     <div class="reveal" data-kind="hint" data-label="hint">
       <ul>
-        <li>Wrap the window aggregation from 2.3 in a second CTE (for example <code>windowed</code>), and select from it.</li>
-        <li><code>ML_DETECT_ANOMALIES</code> runs over an <code>OVER</code> window. The <code>OVER</code> clause looks like this:
-          <pre data-lang="sql"><code>OVER (
-    PARTITION BY ...
-    ORDER BY ...
-    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-) AS anomaly_tire_temp_fl_result</code></pre>
-        </li>
+        <li><code>&lt;value&gt;</code> is the column to check for anomalies.</li>
+        <li><code>&lt;timestamp&gt;</code> and <code>&lt;order column&gt;</code> are both the time attribute of the windowed rows. <code>TUMBLE</code> adds it, next to <code>window_start</code> and <code>window_end</code>.</li>
+        <li><code>&lt;partition column&gt;</code> decides whose history the detector learns from. We want one history per car.</li>
       </ul>
     </div>
     <div class="reveal" data-kind="solution" data-label="solution">
@@ -966,7 +1087,7 @@ FROM windowed</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-2-5" data-title="2.5 Reset the race">
+  <article class="card" id="step-2-5" data-minutes="5" data-title="2.5 Reset the race">
     <header class="card-intro">
       <h2 class="intro-title">Reset the race</h2>
     </header>
@@ -992,35 +1113,87 @@ FROM windowed</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-2-6" data-title="2.6 Put it all together: create car_state">
+  <article class="card" id="step-2-6" data-minutes="15" data-title="2.6 Put it all together: create car_state">
     <header class="card-intro">
       <h2 class="intro-title">Put it all together: create <code>car_state</code></h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>CREATE TABLE ... AS SELECT</code> (CTAS) turns a query into a statement that runs continuously and writes its results to a new table.</p>
     </header>
     <div class="card-body">
-    <p>Now combine the join, the window aggregation and the anomaly detection from 2.2–2.4 into one statement that creates the <code>car_state</code> table. <code>car_state</code> holds one row per car (our team only has one car in this example) for every lap (one 20-second window).</p>
-    <p>The table has these columns. The telemetry values are averages over the lap.</p>
-    <ul>
-      <li><code>car_number</code>: the car's number.</li>
-      <li><code>lap</code>: the lap number, starting at lap 1.</li>
-      <li><code>tire_temp_fl_c</code>, <code>tire_temp_fr_c</code>, <code>tire_temp_rl_c</code>, <code>tire_temp_rr_c</code>: the temperature of each tire (front-left, front-right, rear-left, rear-right), in °C.</li>
-      <li><code>tire_pressure_fl_psi</code>, <code>tire_pressure_fr_psi</code>, <code>tire_pressure_rl_psi</code>, <code>tire_pressure_rr_psi</code>: the pressure of each tire, in psi.</li>
-      <li><code>engine_temp_c</code>: the engine temperature, in °C.</li>
-      <li><code>brake_temp_fl_c</code>, <code>brake_temp_fr_c</code>: the temperature of each front brake, in °C.</li>
-      <li><code>battery_charge_pct</code>: the battery charge, in percent.</li>
-      <li><code>fuel_remaining_kg</code>: the fuel left in the car, in kg.</li>
-      <li><code>anomaly_tire_temp_fl</code>: <code>true</code> when <code>ML_DETECT_ANOMALIES</code> finds the front-left tire temperature higher than expected, otherwise <code>false</code>.</li>
-      <li><code>position</code>: the car's position in the race.</li>
-      <li><code>gap_to_ahead_sec</code>: the gap to the car ahead, in seconds.</li>
-      <li><code>gap_to_leader_sec</code>: the gap to the race leader, in seconds.</li>
-      <li><code>pit_stops</code>: the number of pit stops the car has made.</li>
-      <li><code>tire_compound</code>: the current tire compound, for example <code>SOFT</code>.</li>
-      <li><code>tire_age_laps</code>: how many laps the current tires have done.</li>
-    </ul>
-    <p>The <code>CREATE TABLE</code> statement must also set two options in its <code>WITH</code> clause: <code>'changelog.mode' = '...'</code> and <code>'kafka.consumer.isolation-level' = 'read-uncommitted'</code>. Think about which mode <code>car_state</code> needs.</p>
+    <p>The statement below combines the join, the window aggregation and the anomaly detection from 2.2–2.4 into one statement that creates the <code>car_state</code> table. <code>car_state</code> holds one row per car (our team only has one car in this example) for every lap (one 20-second window).</p>
+    <p>The statement also sets two options in its <code>WITH</code> clause: <code>'changelog.mode'</code> and <code>'kafka.consumer.isolation-level' = 'read-uncommitted'</code>. Think about which changelog mode <code>car_state</code> needs.</p>
+    <p>Here's the statement. The <code>CASE</code> expression decides the value of <code>anomaly_tire_temp_fl</code>, but you write its contents:</p>
+    <pre data-lang="sql"><code>CREATE TABLE `car_state` WITH ('changelog.mode' = &lt;changelog mode&gt;, 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
+WITH enriched AS (
+  SELECT
+    t.car_number,
+    t.event_time,
+    t.lap,
+    t.tire_temp_fl_c, t.tire_temp_fr_c, t.tire_temp_rl_c, t.tire_temp_rr_c,
+    t.tire_pressure_fl_psi, t.tire_pressure_fr_psi, t.tire_pressure_rl_psi, t.tire_pressure_rr_psi,
+    t.engine_temp_c,
+    t.brake_temp_fl_c, t.brake_temp_fr_c,
+    t.battery_charge_pct,
+    t.fuel_remaining_kg,
+    r.`position`,
+    r.gap_to_ahead_sec, r.gap_to_leader_sec,
+    r.pit_stops,
+    r.tire_compound,
+    r.tire_age_laps
+  FROM `car_telemetry` t
+  JOIN `race_standings`
+    /*+ OPTIONS('scan.startup.mode'='earliest-offset') */
+    FOR SYSTEM_TIME AS OF &lt;time attribute&gt; AS r
+    ON t.car_number = r.car_number
+),
+windowed AS (
+  SELECT
+    window_start, window_end, window_time, car_number, MAX(lap) AS lap,
+    AVG(tire_temp_fl_c) AS tire_temp_fl_c, AVG(tire_temp_fr_c) AS tire_temp_fr_c,
+    AVG(tire_temp_rl_c) AS tire_temp_rl_c, AVG(tire_temp_rr_c) AS tire_temp_rr_c,
+    AVG(tire_pressure_fl_psi) AS tire_pressure_fl_psi, AVG(tire_pressure_fr_psi) AS tire_pressure_fr_psi,
+    AVG(tire_pressure_rl_psi) AS tire_pressure_rl_psi, AVG(tire_pressure_rr_psi) AS tire_pressure_rr_psi,
+    AVG(engine_temp_c) AS engine_temp_c, AVG(brake_temp_fl_c) AS brake_temp_fl_c, AVG(brake_temp_fr_c) AS brake_temp_fr_c,
+    AVG(battery_charge_pct) AS battery_charge_pct, AVG(fuel_remaining_kg) AS fuel_remaining_kg,
+    MAX(`position`) AS `position`, MAX(gap_to_ahead_sec) AS gap_to_ahead_sec, MAX(gap_to_leader_sec) AS gap_to_leader_sec,
+    MAX(pit_stops) AS pit_stops, MAX(tire_compound) AS tire_compound, MAX(tire_age_laps) AS tire_age_laps
+  FROM TABLE(TUMBLE(TABLE &lt;table&gt;, DESCRIPTOR(&lt;time attribute&gt;), &lt;window size&gt;))
+  GROUP BY window_start, window_end, window_time, car_number
+),
+anomaly AS (
+  SELECT *,
+    ML_DETECT_ANOMALIES(
+      &lt;value&gt;,
+      &lt;timestamp&gt;,
+      JSON_OBJECT('minTrainingSize' VALUE 12, 'maxTrainingSize' VALUE 50, 'confidencePercentage' VALUE 99.99, 'enableStl' VALUE FALSE)
+    )
+    OVER (
+      PARTITION BY &lt;partition column&gt;
+      ORDER BY &lt;order column&gt;
+      RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS anomaly_tire_temp_fl_result
+  FROM windowed
+)
+SELECT
+  car_number, lap,
+  tire_temp_fl_c, tire_temp_fr_c, tire_temp_rl_c, tire_temp_rr_c,
+  tire_pressure_fl_psi, tire_pressure_fr_psi, tire_pressure_rl_psi, tire_pressure_rr_psi,
+  engine_temp_c, brake_temp_fl_c, brake_temp_fr_c, battery_charge_pct, fuel_remaining_kg,
+  CASE
+    WHEN &lt;condition&gt; THEN &lt;then value&gt;
+    ELSE &lt;else value&gt;
+  END AS anomaly_tire_temp_fl,
+  `position`, gap_to_ahead_sec, gap_to_leader_sec, pit_stops, tire_compound, tire_age_laps
+FROM anomaly
+WHERE lap &gt; 0;</code></pre>
     <div class="task">
       <span class="label">Your task</span>
-      <p>Put together everything you've built so far to create the <code>car_state</code> table.</p>
+      <p>Replace <code>&lt;changelog mode&gt;</code>, <code>&lt;condition&gt;</code>, <code>&lt;then value&gt;</code> and <code>&lt;else value&gt;</code>, then run the statement to create the <code>car_state</code> table.</p>
+    </div>
+    <div class="reveal" data-kind="hint" data-label="hint">
+      <ul>
+        <li><code>anomaly_tire_temp_fl_result</code> is the output of the ARIMA model. It's a row with fields such as <code>actual_value</code>, <code>forecast_value</code>, <code>lower_bound</code>, <code>upper_bound</code> and <code>is_anomaly</code>. Read a field with a dot, for example <code>anomaly_tire_temp_fl_result.is_anomaly</code>.</li>
+        <li>Use those fields to define what an anomaly is for us. <code>is_anomaly</code> on its own also flags a tire that's colder than expected. Which value do we care about, and which bound should it cross?</li>
+      </ul>
     </div>
     <div class="reveal" data-kind="solution" data-label="solution">
       <pre data-lang="sql"><code>CREATE TABLE `car_state` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
@@ -1101,7 +1274,7 @@ WHERE lap &gt; 0;</code></pre>
 <!-- ============================== 3. Streaming Agents ============================== -->
 <section class="section" id="section-3" data-title="3. Create a strategy using Streaming Agents" data-eyebrow="Create a strategy using Streaming Agents">
 
-  <article class="card" id="step-3-1" data-title="3.1 The model">
+  <article class="card" id="step-3-1" data-minutes="5" data-title="3.1 The model">
     <header class="card-intro">
       <h2 class="intro-title">The model</h2>
       <p class="learn"><span class="label">What you'll learn</span>Which models your Flink statements can call for inference.</p>
@@ -1126,7 +1299,7 @@ WHERE lap &gt; 0;</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-3-2" data-title="3.2 The agent">
+  <article class="card" id="step-3-2" data-minutes="5" data-title="3.2 The agent">
     <header class="card-intro">
       <h2 class="intro-title">The agent</h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>CREATE AGENT</code> combines a model and a prompt into a Streaming Agent you can call from Flink SQL.</p>
@@ -1140,7 +1313,7 @@ USING PROMPT 'Your prompt';</code></pre>
       <span class="label">Your task</span>
       <p>Create the <code>pit_strategy_agent</code>. Its prompt is long, so copy the statement from the solution.</p>
     </div>
-    <div class="reveal" data-kind="solution" data-label="solution">
+    <div class="reveal" data-kind="solution" data-label="solution" data-hold="false">
       <pre data-lang="sql"><code>CREATE AGENT `pit_strategy_agent`
 USING MODEL `llm_textgen_model`
 USING PROMPT 'OUTPUT FORMAT — respond with exactly these 7 labeled lines in this order. Plain text only, no markdown or bold.
@@ -1209,7 +1382,7 @@ WITH ('max_iterations' = '10');</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-3-3" data-title="3.3 Create the strategy table">
+  <article class="card" id="step-3-3" data-minutes="5" data-title="3.3 Create the strategy table">
     <header class="card-intro">
       <h2 class="intro-title">Create the strategy table</h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>AI_RUN_AGENT</code> calls an agent for every row of a stream, and how to parse the agent's text answer into columns.</p>
@@ -1231,7 +1404,7 @@ LATERAL TABLE(AI_RUN_AGENT(
       <span class="label">Your task</span>
       <p>Create the <code>pit_decisions</code> table. Copy the statement from the solution.</p>
     </div>
-    <div class="reveal" data-kind="solution" data-label="solution">
+    <div class="reveal" data-kind="solution" data-label="solution" data-hold="false">
       <pre data-lang="sql"><code>CREATE TABLE `pit_decisions` WITH ('changelog.mode' = 'append', 'kafka.consumer.isolation-level' = 'read-uncommitted') AS
 SELECT
   cs.car_number, cs.lap, cs.`position`,
@@ -1285,7 +1458,7 @@ LATERAL TABLE(AI_RUN_AGENT(
 <!-- ============================== 4. Start the race ============================== -->
 <section class="section" id="section-4" data-title="4. Start the race" data-eyebrow="Start the race">
 
-  <article class="card" id="step-4-1" data-title="4.1 Start the race and open the Pit Wall">
+  <article class="card" id="step-4-1" data-minutes="5" data-title="4.1 Start the race and open the Pit Wall">
     <header class="card-intro">
       <h2 class="intro-title">Start the race and open the Pit Wall</h2>
     </header>
@@ -1315,7 +1488,46 @@ LATERAL TABLE(AI_RUN_AGENT(
     </div>
   </article>
 
-  <article class="card" id="step-4-2" data-title="4.2 Review car_state">
+  <article class="card" id="step-4-2" data-minutes="5" data-title="4.2 Why car_state is two laps behind (optional)">
+    <header class="card-intro">
+      <h2 class="intro-title">Why <code>car_state</code> is two laps behind (optional)</h2>
+      <p class="learn"><span class="label">What you'll learn</span>How a watermark decides when Flink closes a window, and why that keeps <code>car_state</code> two laps behind the race.</p>
+    </header>
+    <div class="card-body">
+    <p>Compare the Pit Wall's lap counter with the newest row of a <code>car_state</code> query: when the counter shows lap 7, the newest row is lap 5. The <strong>AI Pit Strategist</strong> feed, which labels each decision with its lap, is just as far behind. Nothing is wrong: your statement is waiting for its watermark.</p>
+    <p><strong>One lap comes from the window.</strong> Each 20-second <code>TUMBLE</code> window sums up a whole lap, so Flink can only write lap 5's row once lap 5 is over, and by then the counter shows lap 6.</p>
+    <p><strong>The other lap comes from the watermark.</strong> Flink doesn't close a window when the clock passes the window's end, but when the <em>watermark</em> does. The watermark is Flink's estimate of how far event time has got. Each table's <code>WATERMARK</code> clause, which you saw in <a href="#step-2-2">2.2</a>, keeps it a fixed margin behind the latest <code>event_time</code> Flink has read from that table. A join can only move on once both of its inputs have, so its watermark is the lower of the two:</p>
+    <table>
+      <thead><tr><th>Table</th><th>Watermark</th><th>New rows arrive</th></tr></thead>
+      <tbody>
+        <tr><td><code>car_telemetry</code></td><td>latest <code>event_time</code> − 5 seconds</td><td>every 2 seconds</td></tr>
+        <tr><td><code>race_standings</code></td><td>latest <code>event_time</code> − 10 seconds</td><td>once per lap, as the lap starts</td></tr>
+      </tbody>
+    </table>
+    <p><code>race_standings</code> is what holds the window open: its margin is bigger, and its watermark only moves once per lap. For example, lap 5 runs from second 80 to second 100 of the race:</p>
+    <table>
+      <thead><tr><th>Second</th><th><code>race_standings</code> receives</th><th>Its watermark</th><th>Lap 5's window (80–100)</th></tr></thead>
+      <tbody>
+        <tr><td>80</td><td>lap 5's standings</td><td>70</td><td>Open: it collects lap 5's telemetry</td></tr>
+        <tr><td>100</td><td>lap 6's standings</td><td>90</td><td>Still open: 90 is before its end, 100</td></tr>
+        <tr><td>120</td><td>lap 7's standings</td><td>110</td><td>Closed: Flink writes lap 5's row</td></tr>
+      </tbody>
+    </table>
+    <p>At second 120, the counter shows lap 7. Every lap goes the same way, so <code>car_state</code> stays two laps behind, and each row arrives about 20 seconds after its lap ends.</p>
+    <p>The rest of the pipeline inherits the delay. <code>pit_decisions</code> makes one agent call per <code>car_state</code> row, so the <strong>AI Pit Strategist</strong> is two laps behind too, plus the few seconds the model takes to answer. The lap 24 anomaly reaches the dashboard when the counter shows lap 26.</p>
+    <p>A smaller margin would shorten the wait, at a cost: once the watermark passes a moment, Flink treats that moment as finished, so a row from it that arrives later is left out of the results.</p>
+    <div class="more">
+      <span class="label">Learn more</span>
+      <ul>
+        <li><a href="https://docs.confluent.io/cloud/current/flink/concepts/timely-stream-processing.html">Time and Watermarks</a></li>
+        <li><a href="https://docs.confluent.io/cloud/current/flink/reference/queries/window-aggregation.html">Window Aggregation Queries</a></li>
+        <li><a href="https://docs.confluent.io/cloud/current/flink/reference/queries/joins.html#event-time-temporal-joins">Event-time temporal joins</a></li>
+      </ul>
+    </div>
+    </div>
+  </article>
+
+  <article class="card" id="step-4-3" data-minutes="10" data-title="4.3 Review car_state">
     <header class="card-intro">
       <h2 class="intro-title">Review <code>car_state</code></h2>
       <p class="learn"><span class="label">What you'll learn</span>How <code>car_state</code> fills up lap by lap, when the anomaly detector has enough history to flag a spike, and how to query the table your statement writes to.</p>
@@ -1357,14 +1569,14 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
     <details class="trouble">
       <summary><svg class="i"><use href="#i-wrench"/></svg>Troubleshooting<svg class="i chev"><use href="#i-chev"/></svg></summary>
       <ul>
-        <li><strong><code>car_state</code> is empty at first.</strong> <code>f1-race</code> waits up to 20 seconds before lap 1, and Flink writes a lap's row only after the lap ends, so the first row can take a minute or so to appear.</li>
+        <li><strong><code>car_state</code> is empty at first.</strong> <code>f1-race</code> waits up to 20 seconds before lap 1, and Flink writes a lap's row about 20 seconds after the lap ends (see <a href="#step-4-2">4.2</a>), so the first row can take a minute or so to appear.</li>
         <li><strong>No anomaly at lap 24, or lap numbers start over at 1.</strong> <code>car_state</code> needs one clean race from lap 1. The topics held more than one race when you created it, or the race looped after lap 60. Follow <a href="#step-clean-slate">Start from a clean slate</a>.</li>
       </ul>
     </details>
     </div>
   </article>
 
-  <article class="card" id="step-4-3" data-title="4.3 Watch the agent's decisions">
+  <article class="card" id="step-4-4" data-minutes="5" data-title="4.4 Watch the agent's decisions">
     <header class="card-intro">
       <h2 class="intro-title">Watch the agent's decisions</h2>
       <p class="learn"><span class="label">What you'll learn</span>How to read the agent's lap-by-lap recommendations, including its call on the lap 24 anomaly.</p>
@@ -1397,7 +1609,7 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
 <!-- ============================== 5. Lightning Tables ============================== -->
 <section class="section" id="section-5" data-title="5. Expose car_telemetry to AI agents" data-eyebrow="Expose car_telemetry to AI agents with Lightning Tables">
 
-  <article class="card" id="step-5-1" data-title="5.1 Enable a Lightning Table on car_telemetry">
+  <article class="card" id="step-5-1" data-minutes="10" data-title="5.1 Enable a Lightning Table on car_telemetry">
     <header class="card-intro">
       <h2 class="intro-title">Enable a Lightning Table on <code>car_telemetry</code></h2>
       <p class="learn"><span class="label">What you'll learn</span>How to make a topic available to AI agents with a Lightning Table.</p>
@@ -1427,7 +1639,7 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-5-2" data-title="5.2 Connect your coding agent">
+  <article class="card" id="step-5-2" data-minutes="5" data-title="5.2 Connect your coding agent">
     <header class="card-intro">
       <h2 class="intro-title">Connect your coding agent</h2>
     </header>
@@ -1447,7 +1659,7 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
     </div>
   </article>
 
-  <article class="card" id="step-5-3" data-title="5.3 Ask questions in plain English">
+  <article class="card" id="step-5-3" data-minutes="5" data-title="5.3 Ask questions in plain English">
     <header class="card-intro">
       <h2 class="intro-title">Ask questions in plain English</h2>
       <p class="learn"><span class="label">What you'll learn</span>How an AI agent answers questions about a live stream by querying a Lightning Table.</p>
@@ -1469,7 +1681,7 @@ WHERE anomaly_tire_temp_fl = true;</code></pre>
 <!-- ============================== 6. Social media agent ============================== -->
 <section class="section" id="section-6" data-title="6. Create a social media agent" data-eyebrow="Create a social media agent with Lightning Tables">
 
-  <article class="card" id="step-6-1" data-title="6.1 Draft a post from live race data">
+  <article class="card" id="step-6-1" data-minutes="10" data-title="6.1 Draft a post from live race data">
     <header class="card-intro">
       <h2 class="intro-title">Draft a post from live race data</h2>
       <p class="learn"><span class="label">What you'll learn</span>How to ground an AI agent's output in live race data through Lightning Tables.</p>
@@ -1541,7 +1753,7 @@ OUTPUT
 <!-- ============================== 7. Lightning Queries ============================== -->
 <section class="section" id="section-7" data-title="7. Analyze race data with Lightning Queries" data-eyebrow="Analyze race data with Lightning Queries">
 
-  <article class="card" id="step-7-1" data-title="7.1 Query pit_decisions with SQL over REST">
+  <article class="card" id="step-7-1" data-minutes="10" data-title="7.1 Query pit_decisions with SQL over REST">
     <header class="card-intro">
       <h2 class="intro-title">Query <code>pit_decisions</code> with SQL over REST</h2>
       <p class="learn"><span class="label">What you'll learn</span>How Lightning Tables and Lightning Queries make real-time context queryable with SQL.</p>
@@ -1671,12 +1883,14 @@ OUTPUT
     "BUCKETS LIMIT SHOW TABLES MODELS AGENTS DESCRIBE TRUE FALSE INT TIMESTAMP STRING MAP VALUE").split(" "));
   const span = (cls, s) => `<span class="${cls}">${esc(s)}</span>`;
   function hlSql(src) {
-    const re = /(--[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^']|'')*')|(`[^`]*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+    // A placeholder such as <column> or <time attribute> is for the reader to fill in, so it gets its own look.
+    const re = /(--[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^']|'')*')|(`[^`]*`)|(<[a-z][a-z _]*>)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
     let out = "", last = 0, m;
     while ((m = re.exec(src))) {
       out += esc(src.slice(last, m.index));
-      const [tok, com, str, bq, num, word] = m;
-      if (com) out += span("t-c", tok);
+      const [tok, com, str, bq, ph, num, word] = m;
+      if (ph) out += span("t-p", tok);
+      else if (com) out += span("t-c", tok);
       else if (str) out += span("t-s", tok);
       else if (bq) out += span("t-q", tok);
       else if (num) out += span("t-n", tok);
@@ -1756,8 +1970,87 @@ OUTPUT
   });
 
   // ---------- Hint and solution toggles ----------
+  // A solution opens only after a press and hold, so attendees try the task first; closing it is a click.
+  // It is also time-locked until 5 minutes before its step's suggested end (see "Solution time locks" below).
+  // data-hold="false" opts a solution out of both: the task asks you to copy its statement, so there's nothing to hold back.
   const REVEAL_ICON = { hint: "i-bulb", solution: "i-check-circle" };
+  const HOLD_MS = 1500;
+  const holdLocks = []; // one per held solution; each gets its unlockAt once the schedule is known
   let revealId = 0;
+
+  // Minutes since local midnight: the lock compares the time of day only, never the date.
+  const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+
+  function holdToOpen(btn, isOpen, open, close) {
+    const fill = document.createElement("span");
+    fill.className = "hold-fill";
+    btn.prepend(fill);
+    btn.style.setProperty("--hold-ms", HOLD_MS + "ms");
+    const note = document.createElement("span"); // "Solution unlocks at …", next to the button
+    note.className = "lock-note";
+    note.setAttribute("role", "status");
+    const lock = { btn, note, unlockAt: null };
+    const locked = () => lock.unlockAt !== null && nowMin() < lock.unlockAt;
+    lock.sync = () => {
+      const on = !isOpen() && locked();
+      btn.classList.toggle("locked", on);
+      if (on) btn.setAttribute("aria-disabled", "true"); else btn.removeAttribute("aria-disabled");
+      btn.querySelector("use").setAttribute("href", on ? "#i-clock" : "#i-check-circle");
+      if (!on) note.textContent = "";
+    };
+    // A press while locked: say when it unlocks, with no fill and no nudge.
+    const refuse = () => { lock.sync(); note.textContent = `Solution unlocks at ${hhmm(lock.unlockAt)}`; };
+    let timer = 0;
+    let keyHold = false;     // the current Space/Enter press started a hold, so its keyup mustn't click
+    let swallowClick = false; // a completed pointer hold: the click from its release mustn't close the solution
+    const start = (byPointer) => {
+      if (locked()) { refuse(); return; }
+      btn.classList.remove("nudge");
+      btn.classList.add("holding");
+      timer = setTimeout(() => {
+        timer = 0;
+        btn.classList.remove("holding");
+        swallowClick = byPointer;
+        open();
+      }, HOLD_MS);
+    };
+    const stop = () => {
+      if (!timer) return;
+      clearTimeout(timer); timer = 0;
+      btn.classList.remove("holding");
+      void btn.offsetWidth; // restart the nudge if one is still playing
+      btn.classList.add("nudge");
+    };
+    btn.addEventListener("animationend", () => btn.classList.remove("nudge"));
+    btn.addEventListener("pointerdown", (e) => {
+      swallowClick = false;
+      if (e.button === 0 && !isOpen() && !timer) start(true);
+    });
+    ["pointerup", "pointerleave", "pointercancel", "blur"].forEach((t) => btn.addEventListener(t, stop));
+    btn.addEventListener("contextmenu", (e) => e.preventDefault()); // a touch long-press would open the menu
+    const isKey = (e) => e.key === " " || e.key === "Enter";
+    btn.addEventListener("keydown", (e) => {
+      if (!isKey(e)) return;
+      if (e.repeat) { e.preventDefault(); return; }
+      if (isOpen()) return; // the browser's own click closes it
+      e.preventDefault();
+      keyHold = true;
+      if (!timer) start(false);
+    });
+    btn.addEventListener("keyup", (e) => {
+      if (!isKey(e) || !keyHold) return;
+      e.preventDefault();
+      keyHold = false;
+      stop();
+    });
+    btn.addEventListener("click", (e) => {
+      if (swallowClick) { swallowClick = false; return; }
+      if (isOpen()) close();
+      else if (e.detail === 0) { if (locked()) refuse(); else open(); } // a screen reader's click: it can't press and hold
+    });
+    return lock;
+  }
+
   $$(".reveal").forEach((first) => {
     const prev = first.previousElementSibling;
     if (prev && prev.classList.contains("reveal")) return;
@@ -1773,17 +2066,32 @@ OUTPUT
       title.className = "reveal-title";
       title.textContent = label.charAt(0).toUpperCase() + label.slice(1);
       panel.prepend(title);
+      const hold = panel.dataset.kind === "solution" && panel.dataset.hold !== "false";
       const btn = document.createElement("button");
-      btn.type = "button"; btn.className = "reveal-btn";
+      btn.type = "button"; btn.className = hold ? "reveal-btn hold" : "reveal-btn";
       btn.setAttribute("aria-controls", panel.id);
       btn.innerHTML = `${icon(REVEAL_ICON[panel.dataset.kind] || "i-check-circle")}<span></span>`;
+      const text = btn.querySelector("span");
+      let lock = null;
       const sync = () => {
-        btn.querySelector("span").textContent = (panel.hidden ? "Show " : "Hide ") + label;
+        text.textContent = (panel.hidden ? (hold ? "Hold to show " : "Show ") : "Hide ") + label;
         btn.setAttribute("aria-expanded", String(!panel.hidden));
+        if (lock) lock.sync();
       };
-      btn.addEventListener("click", () => { panel.hidden = !panel.hidden; sync(); });
+      const setOpen = (open) => { panel.hidden = !open; sync(); };
+      if (hold) {
+        lock = holdToOpen(btn, () => !panel.hidden, () => setOpen(true), () => setOpen(false));
+        holdLocks.push(lock);
+        // Button and note travel together, so an empty note adds no gap to the row.
+        const pair = document.createElement("span");
+        pair.className = "reveal-pair";
+        pair.append(btn, lock.note);
+        row.appendChild(pair);
+      } else {
+        btn.addEventListener("click", () => setOpen(panel.hidden));
+        row.appendChild(btn);
+      }
       sync();
-      row.appendChild(btn);
     });
     first.before(row);
   });
@@ -1874,6 +2182,50 @@ OUTPUT
     sidePanel("trouble-panel", ".trouble", "troubleOpen"),
   ];
 
+  // ---------- Suggested time: each card's data-minutes, laid end to end from DAY_START ----------
+  const DAY_START = 9 * 60 + 10; // 1.1 starts at 09:10
+  const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  const range = (s) => hhmm(s.from) + "–" + hhmm(s.to);
+  const slots = new Map(); // card id -> { min, from, to }
+  let clockAt = DAY_START;
+  cards.forEach((c) => {
+    const min = Number(c.dataset.minutes);
+    if (min) { slots.set(c.id, { min, from: clockAt, to: clockAt + min }); clockAt += min; }
+  });
+  // A section's total, only where it has more than one timed step (otherwise it repeats the step's line).
+  const sectionSlots = new Map(); // section id -> { n, min, from, to }
+  $$(".section").forEach((sec) => {
+    const s = $$(".card", sec).map((c) => slots.get(c.id)).filter(Boolean);
+    const n = (sec.dataset.title.match(/^\d+/) || [])[0];
+    if (n && s.length > 1) sectionSlots.set(sec.id, { n, min: s.reduce((t, x) => t + x.min, 0), from: s[0].from, to: s[s.length - 1].to });
+  });
+  // ---------- Solution time locks: a held solution unlocks 5 minutes before its step's suggested end ----------
+  // Feature flag: ?locks=off in the URL (exactly that value) turns the time locks off, for rehearsals and for working
+  // through the guide after the workshop. Solutions still open on a press and hold. Nothing is saved: the flag lasts
+  // only while it's in the URL, which keeps it across step navigation (that only changes the #hash) and reloads.
+  const UNLOCK_LEAD = 5;
+  const LOCKS_OFF = new URLSearchParams(location.search).get("locks") === "off";
+  holdLocks.forEach((lock) => {
+    const s = slots.get(lock.btn.closest(".card").id);
+    lock.unlockAt = s && !LOCKS_OFF ? s.to - UNLOCK_LEAD : null;
+    lock.sync();
+  });
+  // An open page unlocks on its own, within a few seconds of the unlock time.
+  if (!LOCKS_OFF) setInterval(() => holdLocks.forEach((lock) => lock.sync()), 5000);
+
+  const timePanel = $("#time-panel");
+  function renderTime() {
+    const s = current && slots.get(current.id);
+    timePanel.hidden = !s;
+    if (!s) return;
+    $(".tp-min", timePanel).textContent = s.min + " min";
+    $(".tp-range", timePanel).textContent = range(s);
+    const sec = sectionOf(current) && sectionSlots.get(sectionOf(current).id);
+    const line = $(".tp-section", timePanel);
+    line.hidden = !sec;
+    if (sec) line.textContent = `Section ${sec.n}: ${sec.min} min, ${range(sec)}`;
+  }
+
   function render() {
     cards.forEach((c, i) => {
       tabs[i].classList.toggle("done", state.done.includes(c.id));
@@ -1888,7 +2240,9 @@ OUTPUT
     nextBtn.title = i < cards.length - 1 ? "Next: " + titleOf(cards[i + 1]) : "";
     $(".finish-msg", lastCard).hidden = !state.done.includes(lastCard.id);
     sidePanels.forEach((renderPanel) => renderPanel());
+    renderTime();
     $(".side-panels").hidden = $$(".side-panel").every((el) => el.hidden);
+    $(".side-row").hidden = $(".side-panels").hidden && timePanel.hidden;
   }
   function markDone(c) {
     if (counted(c) && !state.done.includes(c.id)) state.done.push(c.id);
